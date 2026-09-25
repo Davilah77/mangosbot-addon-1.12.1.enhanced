@@ -58,3 +58,8 @@ Many class strategy buttons in the original interface target legacy strategies f
 Original project: <https://github.com/ike3/mangosbot-addon>
 
 This fork keeps the upstream project untouched and tracks it as the source of the original WoW UI.
+
+## Captures
+
+<img width="1838" height="1430" alt="image" src="https://github.com/user-attachments/assets/1f28fe9a-9f01-4118-bfac-40f42d86e3b0" />
+
