@@ -1,5 +1,19 @@
 # Changelog
 
+## 0.2.4 - 2026-09-25
+
+### Panel activation
+
+- Removed automatic individual-panel opening when targeting a bot in the game world.
+- Individual panels now open only by clicking that bot in the general roster.
+
+### Talent list reliability
+
+- Replaced the fixed one-second talent-list timeout with per-bot response collection that finishes after the reply becomes quiet.
+- Accumulated multi-part talent replies and parsed comma-separated builds across the complete response.
+- Made `Choose Spec` wait for an in-progress list and open the menu automatically when loading finishes.
+- Made `Choose Spec` request the list itself when no cached builds are available.
+
 ## 0.2.3 - 2026-09-25
 
 ### Bot panels and talents

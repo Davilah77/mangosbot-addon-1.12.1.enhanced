@@ -1,5 +1,4 @@
 local Mangosbot_EventFrame = CreateFrame("Frame")
-Mangosbot_EventFrame:RegisterEvent("PLAYER_TARGET_CHANGED")
 Mangosbot_EventFrame:RegisterEvent("CHAT_MSG_WHISPER")
 Mangosbot_EventFrame:RegisterEvent("CHAT_MSG_WHISPER_INFORM")
 Mangosbot_EventFrame:RegisterEvent("CHAT_MSG_ADDON")
@@ -92,28 +91,26 @@ function GearCurrentBot()
     SendBotAdminCommand(".bot gear")
 end
 
-function ListCurrentBotTalents()
-    local bot = GetCurrentBotName()
+function RequestBotTalentList(bot, openWhenReady)
     if (bot == nil) then return end
     if (botTable[bot] == nil) then botTable[bot] = {} end
     botTable[bot].talentBuilds = {}
     botTable[bot].talentBuildCommands = {}
-    PendingTalentListBot = bot
-    TalentMenuOpenScheduled = false
+    botTable[bot].talentListBuffer = ""
+    botTable[bot].openTalentMenuWhenReady = openWhenReady == true
+    botTable[bot].talentListRevision = (botTable[bot].talentListRevision or 0) + 1
+    PendingTalentListBots[bot] = true
     SendBotCommand("talents list", "WHISPER", nil, bot)
-    wait(1.0, function(name)
-        if (PendingTalentListBot ~= name) then return end
-        PendingTalentListBot = nil
-        local count = 0
-        if (botTable[name] ~= nil and botTable[name].talentBuilds ~= nil) then
-            count = tablelength(botTable[name].talentBuilds)
+    local revision = botTable[bot].talentListRevision
+    wait(5.0, function(name, expectedRevision)
+        if (PendingTalentListBots[name] and botTable[name] ~= nil and botTable[name].talentListRevision == expectedRevision) then
+            FinalizeTalentList(name)
         end
-        if (count > 0) then
-            DEFAULT_CHAT_FRAME:AddMessage("MangosBot: " .. count .. " talent specializations loaded for " .. name .. ".")
-        else
-            DEFAULT_CHAT_FRAME:AddMessage("MangosBot: no talent specializations received from " .. name .. ".")
-        end
-    end, bot)
+    end, bot, revision)
+end
+
+function ListCurrentBotTalents()
+    RequestBotTalentList(GetCurrentBotName(), false)
 end
 
 function ResetCurrentBotTalents()
@@ -132,7 +129,7 @@ function ApplyTalentBuild(buildName)
     end
     SendBotCommand("talents " .. buildCommand, "WHISPER", nil, bot)
     wait(0.3, function(name) SendBotCommand(".reset stats " .. name, "SAY") end, bot)
-    PendingTalentListBot = nil
+    PendingTalentListBots[bot] = nil
 end
 
 function CreateToolBar(frame, y, name, buttons, x, spacing, register)
@@ -2040,8 +2037,7 @@ function OpenDropDownMenu(bot)
 end
 
 TalentMenuForBot = nil
-PendingTalentListBot = nil
-TalentMenuOpenScheduled = false
+PendingTalentListBots = {}
 
 function CreateTalentDropDownMenu(parent)
     local menu = CreateFrame("Frame", "MangosbotTalentDropDownMenu", parent, "UIDropDownMenuTemplate")
@@ -2068,7 +2064,13 @@ function OpenTalentMenu(bot)
     TalentMenuForBot = bot
     local builds = botTable[bot] and botTable[bot].talentBuilds
     if (builds == nil or tablelength(builds) == 0) then
-        DEFAULT_CHAT_FRAME:AddMessage("MangosBot: use List Talents first.")
+        if (PendingTalentListBots[bot]) then
+            botTable[bot].openTalentMenuWhenReady = true
+            DEFAULT_CHAT_FRAME:AddMessage("MangosBot: talent specializations are still loading for " .. bot .. ".")
+        else
+            DEFAULT_CHAT_FRAME:AddMessage("MangosBot: loading talent specializations for " .. bot .. ".")
+            RequestBotTalentList(bot, true)
+        end
         return
     end
     local scale,x,y = SelectedBotPanel:GetEffectiveScale(),GetCursorPosition()
@@ -2183,10 +2185,51 @@ function AddTalentBuild(bot, buildName, buildCommand)
     return true
 end
 
+function FinalizeTalentList(bot)
+    if (bot == nil or not PendingTalentListBots[bot]) then return end
+    PendingTalentListBots[bot] = nil
+    local count = 0
+    if (botTable[bot] ~= nil and botTable[bot].talentBuilds ~= nil) then
+        count = tablelength(botTable[bot].talentBuilds)
+    end
+    if (count > 0) then
+        DEFAULT_CHAT_FRAME:AddMessage("MangosBot: " .. count .. " talent specializations loaded for " .. bot .. ".")
+        if (botTable[bot].openTalentMenuWhenReady) then
+            botTable[bot].openTalentMenuWhenReady = false
+            OpenTalentMenu(bot)
+        end
+    else
+        DEFAULT_CHAT_FRAME:AddMessage("MangosBot: no talent specializations received from " .. bot .. ".")
+    end
+end
+
+function ScheduleTalentListFinalize(bot)
+    if (botTable[bot] == nil) then return end
+    botTable[bot].talentListRevision = (botTable[bot].talentListRevision or 0) + 1
+    local revision = botTable[bot].talentListRevision
+    wait(1.0, function(name, expectedRevision)
+        if (PendingTalentListBots[name] and botTable[name] ~= nil and botTable[name].talentListRevision == expectedRevision) then
+            FinalizeTalentList(name)
+        end
+    end, bot, revision)
+end
+
 function ParseTalentBuildList(message, sender)
-    if (sender == nil or sender ~= PendingTalentListBot or message == nil) then return false end
+    if (sender == nil or not PendingTalentListBots[sender] or message == nil) then return false end
+    local bot = botTable[sender]
+    -- Join packets without inserting characters because classic chat may
+    -- split in the middle of a build. Add a delimiter only when the server
+    -- starts a fresh pve/pvp entry in a new packet without repeating a comma.
+    local separator = ""
+    if bot.talentListBuffer ~= nil and string.len(bot.talentListBuffer) > 0 then
+        local startsFresh = string.find(message, "^pve ") == 1 or string.find(message, "^pvp ") == 1
+        if startsFresh and string.sub(bot.talentListBuffer, -1) ~= "," then separator = "," end
+    end
+    bot.talentListBuffer = (bot.talentListBuffer or "") .. separator .. message
+    bot.talentBuilds = {}
+    bot.talentBuildCommands = {}
     local found = false
-    local entries = splitString2(message, ", ")
+    local entries = splitString2(bot.talentListBuffer, ",")
     for _, entry in pairs(entries) do
         local buildName = trim2(SanitizeBotCommand(entry))
         -- Some classic cores surround each number with hyperlink markers,
@@ -2204,6 +2247,7 @@ function ParseTalentBuildList(message, sender)
             if (AddTalentBuild(sender, buildName, buildCommand)) then found = true end
         end
     end
+    if (found) then ScheduleTalentListFinalize(sender) end
     return found
 end
 
@@ -2255,19 +2299,6 @@ end
 Mangosbot_EventFrame:SetScript("OnEvent", function(self)
     if (event == "CHAT_MSG_WHISPER" or event == "CHAT_MSG_PARTY" or event == "CHAT_MSG_RAID" or event == "CHAT_MSG_GUILD") then
         ParseTalentBuildList(arg1, arg2)
-    end
-
-    if (event == "PLAYER_TARGET_CHANGED") then
-        local name = GetUnitName("target")
-        local self = GetUnitName("player")
-        -- Keep a roster-selected bot pinned while the player changes targets
-        -- in combat.  A valid bot target may select/open a panel, but invalid
-        -- or enemy targets must never close an already open one.
-        if (name ~= nil and UnitExists("target") and not UnitIsEnemy("target", "player") and UnitIsPlayer("target") and name ~= self and botTable[name] ~= nil) then
-            CurrentBot = name
-            ShowSelectedBot(CurrentBot)
-            QuerySelectedBot(name)
-        end
     end
 
     if (event == "CHAT_MSG_SYSTEM") then
