@@ -1,6 +1,21 @@
 # Changelog
 
-## 0.2.0-beta.2 - 2026-09-25
+## 0.2.3 - 2026-09-25
+
+### Bot panels and talents
+
+- Added one independently movable control panel per selected bot instead of reusing a single global panel.
+- Reordered maintenance controls to `Match Level | Gear | Replies` and `Reset Talents | List Talents | Choose Spec`.
+- Removed residual `|h` hyperlink markers from talent replies and converted talent distributions to the accepted `0-0-0` command format.
+
+### Group controls
+
+- Added `pet passive` plus `pet follow` or `pet stay` to group movement/passive commands so hunter and warlock pets disengage.
+- Changed the group loot button from a one-shot collection action to the persistent `nc ~loot` strategy toggle.
+- Kept individual save-mana state attached to each bot panel instead of sharing one set of highlighted controls.
+- Made strategy buttons true ON/OFF controls whose green state is no longer cleared by unrelated bot acknowledgements.
+
+## 0.2.2 - 2026-09-25
 
 ### Talent controls
 
@@ -13,7 +28,7 @@
 - Extended `Replies: OFF` to hide the local echo of outgoing bot whispers.
 - Made the individual `save mana` controls store and display their level per bot while continuing to whisper only the selected bot.
 
-## 0.2.0-beta.1 - 2026-09-25
+## 0.2.1 - 2026-09-25
 
 ### Bot maintenance and talents
 

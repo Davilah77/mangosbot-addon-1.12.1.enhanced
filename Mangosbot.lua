@@ -29,6 +29,7 @@ function SanitizeBotCommand(text)
     text = string.gsub(text, "|c%x%x%x%x%x%x%x%x", "")
     text = string.gsub(text, "|r", "")
     text = string.gsub(text, "|H.-|h(.-)|h", "%1")
+    text = string.gsub(text, "|h", "")
     text = string.gsub(text, "|", "")
     return text
 end
@@ -59,13 +60,15 @@ function BotRepliesEnabled()
 end
 
 function UpdateReplyButton()
-    if (SelectedBotPanel == nil or SelectedBotPanel.maintenance == nil) then return end
-    local button = SelectedBotPanel.maintenance.replyButton
-    if (button == nil) then return end
-    if (BotRepliesEnabled()) then
-        button:SetText("Replies: ON")
-    else
-        button:SetText("Replies: OFF")
+    if (SelectedBotPanels == nil) then return end
+    for _, panel in pairs(SelectedBotPanels) do
+        if (panel.maintenance ~= nil and panel.maintenance.replyButton ~= nil) then
+            if (BotRepliesEnabled()) then
+                panel.maintenance.replyButton:SetText("Replies: ON")
+            else
+                panel.maintenance.replyButton:SetText("Replies: OFF")
+            end
+        end
     end
 end
 
@@ -94,6 +97,7 @@ function ListCurrentBotTalents()
     if (bot == nil) then return end
     if (botTable[bot] == nil) then botTable[bot] = {} end
     botTable[bot].talentBuilds = {}
+    botTable[bot].talentBuildCommands = {}
     PendingTalentListBot = bot
     TalentMenuOpenScheduled = false
     SendBotCommand("talents list", "WHISPER", nil, bot)
@@ -122,7 +126,11 @@ end
 function ApplyTalentBuild(buildName)
     local bot = TalentMenuForBot
     if (bot == nil or buildName == nil) then return end
-    SendBotCommand("talents " .. buildName, "WHISPER", nil, bot)
+    local buildCommand = buildName
+    if (botTable[bot] ~= nil and botTable[bot].talentBuildCommands ~= nil and botTable[bot].talentBuildCommands[buildName] ~= nil) then
+        buildCommand = botTable[bot].talentBuildCommands[buildName]
+    end
+    SendBotCommand("talents " .. buildCommand, "WHISPER", nil, bot)
     wait(0.3, function(name) SendBotCommand(".reset stats " .. name, "SAY") end, bot)
     PendingTalentListBot = nil
 end
@@ -136,7 +144,7 @@ function CreateToolBar(frame, y, name, buttons, x, spacing, register)
         frame.toolbar = {}
     end
 
-    local tb = CreateFrame("Frame", "Toolbar" .. name, frame)
+    local tb = CreateFrame("Frame", nil, frame)
     tb:SetPoint("TOPLEFT", frame, "TOPLEFT", x, y)
     tb:SetWidth(frame:GetWidth() - x - 5)
     tb:SetHeight(22)
@@ -150,7 +158,7 @@ function CreateToolBar(frame, y, name, buttons, x, spacing, register)
 
     tb.buttons = {}
     for key, button in pairs(buttons) do
-        local btn = CreateFrame("Button", "Toolbar" .. name .. key, tb)
+        local btn = CreateFrame("Button", nil, tb)
         btn:SetPoint("TOPLEFT", tb, "TOPLEFT", button["index"] * (22 + spacing), 0)
         btn:SetWidth(20)
         btn:SetHeight(20)
@@ -175,12 +183,19 @@ function CreateToolBar(frame, y, name, buttons, x, spacing, register)
         btn["emote"] = button["emote"]
         btn["group"] = button["group"]
         btn["handler"] = button["handler"]
+        btn["strategy"] = button["strategy"]
+        btn["stateful"] = button["strategy"] ~= nil and button["strategy"] ~= ""
+        btn["isActive"] = false
         btn["ToolBarButtonOnClick"] = ToolBarButtonOnClick;
         btn:SetScript("OnClick", function()
+            if (frame.botName ~= nil) then
+                CurrentBot = frame.botName
+                SelectedBotPanel = frame
+            end
             btn["ToolBarButtonOnClick"](btn, true)
         end)
 
-        local image = CreateFrame("Frame", "Toolbar" .. name .. key .. "Image", btn)
+        local image = CreateFrame("Frame", nil, btn)
         image:SetPoint("TOPLEFT", btn, "TOPLEFT", 2, -2)
         image:SetWidth(16)
         image:SetHeight(16)
@@ -226,8 +241,15 @@ function ToolBarButtonOnClick(btn, visual)
         return
     end
 
-    if (visual) then
-      btn:SetBackdropBorderColor(0.8, 0.2, 0.2, 1.0)
+    if (visual and btn["stateful"]) then
+        btn["isActive"] = not btn["isActive"]
+        if (btn["isActive"]) then
+            btn:SetBackdropBorderColor(0.2, 1.0, 0.2, 1.0)
+        else
+            btn:SetBackdropBorderColor(0, 0, 0, 0.0)
+        end
+    elseif (visual) then
+        btn:SetBackdropBorderColor(0.8, 0.2, 0.2, 1.0)
     end
 
     if (btn["emote"] ~= nil) then
@@ -260,6 +282,7 @@ end
 
 function ToggleButton(frame, toolbar, button, toggle, mixed)
     local btn = frame.toolbar[toolbar].buttons[button]
+    btn["isActive"] = toggle
     if (toggle and mixed) then
         btn:SetBackdropBorderColor(0.2, 0.4, 0.2, 1.0)
     elseif (toggle) then
@@ -321,7 +344,7 @@ function EnablePositionSaving(frame, frameName)
 			self:ClearAllPoints()
 
 			if opts.anchorTo == nil then
-                self:SetPoint("CENTER", UIParent, "CENTER")
+                self:SetPoint("CENTER", UIParent, "CENTER", self.defaultOffsetX or 0, self.defaultOffsetY or 0)
 			else
 				self:SetPoint(opts.anchorFrom, UIParent, opts.anchorTo, opts.offsetx, opts.offsety)
 			end
@@ -661,7 +684,7 @@ function CreateMovementToolBar(frame, y, name, group, x, spacing, register)
     local tb = {
         ["follow_master"] = {
             icon = "follow_master",
-            command = {[0] = "follow"},
+            command = group and {[0] = "follow", [1] = "pet passive", [2] = "pet follow"} or {[0] = "follow"},
             strategy = "follow",
             tooltip = "Follow me",
             index = 0,
@@ -670,7 +693,7 @@ function CreateMovementToolBar(frame, y, name, group, x, spacing, register)
         },
         ["stay"] = {
             icon = "stay",
-            command = {[0] = "stay"},
+            command = group and {[0] = "stay", [1] = "pet passive", [2] = "pet stay"} or {[0] = "stay"},
             strategy = "stay",
             tooltip = "Stay in place",
             index = 1,
@@ -693,7 +716,7 @@ function CreateMovementToolBar(frame, y, name, group, x, spacing, register)
 
     tb["flee_passive"] = {
         icon = "flee_passive",
-        command = {[0] = "orders combat passive", [1] = "follow"},
+        command = group and {[0] = "orders combat passive", [1] = "pet passive", [2] = "pet follow", [3] = "follow"} or {[0] = "orders combat passive", [1] = "follow"},
         strategy = "",
         tooltip = "Ignore everything and follow master",
         index = index,
@@ -704,7 +727,7 @@ function CreateMovementToolBar(frame, y, name, group, x, spacing, register)
 
 	tb["passive"] = {
 		icon = "passive",
-		command = {[0] = "orders combat passive"},
+		command = group and {[0] = "orders combat passive", [1] = "pet passive", [2] = "pet follow"} or {[0] = "orders combat passive"},
 		strategy = "passive",
 		tooltip = "Don't rush",
 		index = index,
@@ -715,9 +738,9 @@ function CreateMovementToolBar(frame, y, name, group, x, spacing, register)
     if (group) then
         tb["loot"] = {
             icon = "loot",
-            command = {[0] = "collect combat loot profession quest"},
-            strategy = "",
-            tooltip = "Loot everything",
+            command = {[0] = "nc ~loot"},
+            strategy = "loot",
+            tooltip = "Toggle persistent looting",
             index = index,
             group = group
         }
@@ -984,7 +1007,7 @@ function StartChat()
 end
 
 function CreateMaintenanceTextButton(parent, name, text, x, y, width, tooltip, handler)
-    local button = CreateFrame("Button", name, parent, "UIPanelButtonTemplate")
+    local button = CreateFrame("Button", nil, parent, "UIPanelButtonTemplate")
     button:SetPoint("TOPLEFT", parent, "TOPLEFT", x, y)
     button:SetWidth(width)
     button:SetHeight(20)
@@ -996,12 +1019,19 @@ function CreateMaintenanceTextButton(parent, name, text, x, y, width, tooltip, h
         GameTooltip:Show()
     end)
     button:SetScript("OnLeave", function() GameTooltip:Hide() end)
-    button:SetScript("OnClick", handler)
+    button:SetScript("OnClick", function()
+        if (parent.ownerFrame ~= nil and parent.ownerFrame.botName ~= nil) then
+            CurrentBot = parent.ownerFrame.botName
+            SelectedBotPanel = parent.ownerFrame
+        end
+        handler()
+    end)
     return button
 end
 
 function CreateMaintenancePanel(frame, y)
-    local panel = CreateFrame("Frame", "MangosbotMaintenancePanel", frame)
+    local panel = CreateFrame("Frame", nil, frame)
+    panel.ownerFrame = frame
     panel:SetPoint("TOPLEFT", frame, "TOPLEFT", 5, -y)
     panel:SetWidth(280)
     panel:SetHeight(45)
@@ -1010,27 +1040,31 @@ function CreateMaintenancePanel(frame, y)
         "Match this bot to your level and initialize its basic equipment and abilities.", InitializeCurrentBot)
     panel.gearButton = CreateMaintenanceTextButton(panel, "MangosbotGearButton", "Gear", 87, 0, 62,
         "Generate level- and specialization-appropriate equipment for this bot.", GearCurrentBot)
-    panel.listTalentsButton = CreateMaintenanceTextButton(panel, "MangosbotListTalentsButton", "List Talents", 154, 0, 92,
-        "Ask the bot for every available talent build.", ListCurrentBotTalents)
-
-    panel.chooseTalentButton = CreateMaintenanceTextButton(panel, "MangosbotChooseTalentButton", "Choose Spec", 0, -23, 92,
-        "Choose one of the talent builds returned by List Talents.", function() OpenTalentMenuForCurrentBot() end)
-    panel.resetTalentsButton = CreateMaintenanceTextButton(panel, "MangosbotResetTalentsButton", "Reset Talents", 97, -23, 92,
-        "Clear this bot's talents, then recalculate its stats.", ResetCurrentBotTalents)
-    panel.replyButton = CreateMaintenanceTextButton(panel, "MangosbotReplyButton", "Replies: OFF", 194, -23, 82,
+    panel.replyButton = CreateMaintenanceTextButton(panel, "MangosbotReplyButton", "Replies: OFF", 154, 0, 122,
         "Show or hide automatic bot command replies in chat.", ToggleBotReplies)
+
+    panel.resetTalentsButton = CreateMaintenanceTextButton(panel, "MangosbotResetTalentsButton", "Reset Talents", 0, -23, 92,
+        "Clear this bot's talents, then recalculate its stats.", ResetCurrentBotTalents)
+    panel.listTalentsButton = CreateMaintenanceTextButton(panel, "MangosbotListTalentsButton", "List Talents", 97, -23, 82,
+        "Ask the bot for every available talent build.", ListCurrentBotTalents)
+    panel.chooseTalentButton = CreateMaintenanceTextButton(panel, "MangosbotChooseTalentButton", "Choose Spec", 184, -23, 92,
+        "Choose one of the talent builds returned by List Talents.", function() OpenTalentMenuForCurrentBot() end)
 
     frame.maintenance = panel
     UpdateReplyButton()
     return panel
 end
 
-function CreateSelectedBotPanel()
-    local frame = CreateFrame("Frame", "SelectedBotPanel", UIParent)
+function CreateSelectedBotPanel(botName)
+    local frame = CreateFrame("Frame", nil, UIParent)
+    frame.botName = botName
     frame:Hide()
     frame:SetWidth(170)
     frame:SetHeight(155)
-    frame:SetPoint("CENTER", UIParent, "CENTER")
+    local panelIndex = tablelength(SelectedBotPanels or {})
+    frame.defaultOffsetX = panelIndex * 28
+    frame.defaultOffsetY = panelIndex * -28
+    frame:SetPoint("CENTER", UIParent, "CENTER", frame.defaultOffsetX, frame.defaultOffsetY)
     frame:EnableMouse(true)
     frame:SetMovable(true)
     frame:SetFrameStrata("DIALOG")
@@ -1044,7 +1078,7 @@ function CreateSelectedBotPanel()
     frame:SetBackdropBorderColor(0.5,0.1,0.7,1)
     frame:RegisterForDrag("LeftButton")
 
-    frame.header = CreateFrame("Frame", "SelectedBotPanelHeader", frame)
+    frame.header = CreateFrame("Frame", nil, frame)
     frame.header:SetPoint("TOPLEFT", frame, "TOPLEFT", 0, 0)
     frame.header:SetWidth(frame:GetWidth())
     frame.header:SetHeight(22)
@@ -1057,7 +1091,7 @@ function CreateSelectedBotPanel()
     })
     frame.header:SetBackdropBorderColor(0.5,0.1,0.7,1)
 
-    frame.header.text = frame.header:CreateFontString("SelectedBotPanelHeaderText")
+    frame.header.text = frame.header:CreateFontString(nil)
     frame.header.text:SetPoint("TOPLEFT", frame, "TOPLEFT", 22, 0)
     frame.header.text:SetWidth(frame.header:GetWidth())
     frame.header.text:SetHeight(22)
@@ -1065,7 +1099,7 @@ function CreateSelectedBotPanel()
     frame.header.text:SetJustifyH("LEFT")
     frame.header.text:SetText("Click!")
 
-    frame.header.role = CreateFrame("Frame", "SelectedBotPanelHeaderRole", frame.header)
+    frame.header.role = CreateFrame("Frame", nil, frame.header)
     frame.header.role:SetPoint("TOPLEFT", frame, "TOPLEFT", 3, -3)
     frame.header.role:SetWidth(16)
     frame.header.role:SetHeight(16)
@@ -1073,7 +1107,7 @@ function CreateSelectedBotPanel()
     frame.header.role.texture:SetTexture("Interface/Addons/Mangosbot/Images/role_dps.tga")
     frame.header.role.texture:SetAllPoints()
 
-    EnablePositionSaving(frame, "SelectedBotPanel")
+    EnablePositionSaving(frame, "SelectedBotPanel_" .. botName)
 
     local y = 25
     CreateMovementToolBar(frame, y, "movement", false, 5, 5, true)
@@ -2059,11 +2093,12 @@ end
 
 
 botTable = {}
-SelectedBotPanel = CreateSelectedBotPanel();
+SelectedBotPanels = {}
+SelectedBotPanel = nil
 BotRoster = CreateBotRoster();
 BotDebugPanel = CreateBotDebugPanel();
 DropDownMenu = CreateDropDownMenu(BotRoster)
-TalentDropDownMenu = CreateTalentDropDownMenu(SelectedBotPanel)
+TalentDropDownMenu = CreateTalentDropDownMenu(UIParent)
 CurrentBot = nil
 BotDebugFilter = ""
 
@@ -2083,14 +2118,22 @@ end
 function ShowSelectedBot(name)
     if (name == nil or botTable[name] == nil) then return end
 
+    local panel = SelectedBotPanels[name]
+    if (panel == nil) then
+        panel = CreateSelectedBotPanel(name)
+        SelectedBotPanels[name] = panel
+    end
+    SelectedBotPanel = panel
+    CurrentBot = name
+
     local bot = botTable[name]
     if (bot["strategy"] == nil) then bot["strategy"] = {nc = {}, co = {}} end
     if (bot["role"] == nil) then bot["role"] = "dps" end
 
     local class = string.upper(bot["class"] or "")
-    SetFrameColor(SelectedBotPanel, class)
-    SelectedBotPanel.header.role.texture:SetTexture("Interface/Addons/Mangosbot/Images/role_" .. bot["role"] .. ".tga")
-    SelectedBotPanel.header.text:SetText(name)
+    SetFrameColor(panel, class)
+    panel.header.role.texture:SetTexture("Interface/Addons/Mangosbot/Images/role_" .. bot["role"] .. ".tga")
+    panel.header.text:SetText(name)
 
     local width = 0
     local height = 0
@@ -2098,9 +2141,9 @@ function ShowSelectedBot(name)
         local panelVisible = true
         if (string.find(toolbarName, "CLASS_") == 1) then
             if (class ~= "" and string.find(string.sub(toolbarName, 7), class) == 1) then
-                SelectedBotPanel.toolbar[toolbarName]:Show()
+                panel.toolbar[toolbarName]:Show()
             else
-                SelectedBotPanel.toolbar[toolbarName]:Hide()
+                panel.toolbar[toolbarName]:Hide()
                 panelVisible = false
             end
         end
@@ -2113,17 +2156,30 @@ function ShowSelectedBot(name)
     height = height + 2
     if (width < 11) then width = 11 end
     UpdateReplyButton()
-    ResizeBotPanel(SelectedBotPanel, width * 25 + 20, height * 25 + 25)
-    SelectedBotPanel:Show()
+    ResizeBotPanel(panel, width * 25 + 20, height * 25 + 25)
+    panel:Show()
 end
 
-function AddTalentBuild(bot, buildName)
+function ToggleSelectedBotPanel(name)
+    local panel = SelectedBotPanels[name]
+    if (panel ~= nil and panel:IsVisible()) then
+        panel:Hide()
+        if (CurrentBot == name) then CurrentBot = nil end
+        return
+    end
+    ShowSelectedBot(name)
+    QuerySelectedBot(name)
+end
+
+function AddTalentBuild(bot, buildName, buildCommand)
     if (botTable[bot] == nil) then botTable[bot] = {} end
     if (botTable[bot].talentBuilds == nil) then botTable[bot].talentBuilds = {} end
+    if (botTable[bot].talentBuildCommands == nil) then botTable[bot].talentBuildCommands = {} end
     for _, existing in pairs(botTable[bot].talentBuilds) do
         if (existing == buildName) then return false end
     end
     table.insert(botTable[bot].talentBuilds, buildName)
+    botTable[bot].talentBuildCommands[buildName] = buildCommand or buildName
     return true
 end
 
@@ -2133,13 +2189,19 @@ function ParseTalentBuildList(message, sender)
     local entries = splitString2(message, ", ")
     for _, entry in pairs(entries) do
         local buildName = trim2(SanitizeBotCommand(entry))
-        -- Keep descriptive qualifiers such as "(mm/sv)" because they are
-        -- part of the configured build name.  Only remove the final point
-        -- distribution displayed by the server, for example "(2/31/18)".
-        local points = string.find(buildName, " %(%d+/%d+/%d+%)$")
-        if (points ~= nil) then buildName = trim2(string.sub(buildName, 1, points - 1)) end
+        -- Some classic cores surround each number with hyperlink markers,
+        -- leaving text such as h17h/h34h/0h after chat formatting. Convert
+        -- every supported representation to the command format 17-34-0.
+        buildName = string.gsub(buildName, "h(%d+)h", "%1")
+        buildName = string.gsub(buildName, "(%d+)h", "%1")
+        local pointsStart, pointsEnd, tree1, tree2, tree3 = string.find(buildName, " %((%d+)[/%-](%d+)[/%-](%d+)%)$")
+        local buildCommand = buildName
+        if (pointsStart ~= nil) then
+            buildCommand = tree1 .. "-" .. tree2 .. "-" .. tree3
+            buildName = trim2(string.sub(buildName, 1, pointsStart - 1)) .. " (" .. buildCommand .. ")"
+        end
         if (string.find(buildName, "^pve ") == 1 or string.find(buildName, "^pvp ") == 1) then
-            if (AddTalentBuild(sender, buildName)) then found = true end
+            if (AddTalentBuild(sender, buildName, buildCommand)) then found = true end
         end
     end
     return found
@@ -2151,6 +2213,19 @@ function IsBotGroupReply(message)
         "Level up!", "pve ", "pvp ", "Following", "Staying", "Fleeing",
         "Formation", "Stance", "Strategies:", "Loot strategy", "Mana save level",
         "rti set to", "rti cc set to"
+    }
+    for _, prefix in pairs(prefixes) do
+        if (string.find(message, prefix) == 1) then return true end
+    end
+    return false
+end
+
+function IsBotStateReply(message)
+    if (message == nil) then return false end
+    local prefixes = {
+        "Strategies: ", "Formation: ", "Stance: ",
+        "Mana save level set: ", "Mana save level: ",
+        "Loot strategy: ", "rti: ", "rti cc: "
     }
     for _, prefix in pairs(prefixes) do
         if (string.find(message, prefix) == 1) then return true end
@@ -2188,7 +2263,7 @@ Mangosbot_EventFrame:SetScript("OnEvent", function(self)
         -- Keep a roster-selected bot pinned while the player changes targets
         -- in combat.  A valid bot target may select/open a panel, but invalid
         -- or enemy targets must never close an already open one.
-        if (CurrentBot == nil and name ~= nil and UnitExists("target") and not UnitIsEnemy("target", "player") and UnitIsPlayer("target") and name ~= self and botTable[name] ~= nil) then
+        if (name ~= nil and UnitExists("target") and not UnitIsEnemy("target", "player") and UnitIsPlayer("target") and name ~= self and botTable[name] ~= nil) then
             CurrentBot = name
             ShowSelectedBot(CurrentBot)
             QuerySelectedBot(name)
@@ -2231,28 +2306,14 @@ Mangosbot_EventFrame:SetScript("OnEvent", function(self)
                 local selectedItem = item
                 item.cls["key"] = key
                 item.cls:SetScript("OnClick", function()
-                    if (CurrentBot == selectedItem.cls["key"]) then
-                        CurrentBot = nil
-                        SelectedBotPanel:Hide()
-                    else
-                        CurrentBot = selectedItem.cls["key"]
-                        ShowSelectedBot(CurrentBot)
-                        QuerySelectedBot(CurrentBot)
-                    end
+                    ToggleSelectedBotPanel(selectedItem.cls["key"])
                 end)
                 -- The name/header area now selects the bot too; previously
                 -- only the tiny 16x16 class icon was clickable.
                 item:EnableMouse(true)
                 item["key"] = key
                 item:SetScript("OnMouseDown", function()
-                    if (CurrentBot == selectedItem["key"]) then
-                        CurrentBot = nil
-                        SelectedBotPanel:Hide()
-                    else
-                        CurrentBot = selectedItem["key"]
-                        ShowSelectedBot(CurrentBot)
-                        QuerySelectedBot(CurrentBot)
-                    end
+                    ToggleSelectedBotPanel(selectedItem["key"])
                 end)
 
                 local filename = "Interface\\Addons\\Mangosbot\\Images\\cls_" .. string.lower(bot["class"]) ..".tga"
@@ -2480,6 +2541,7 @@ Mangosbot_EventFrame:SetScript("OnEvent", function(self)
         local message = arg1
         local sender = arg2
         if (event == "CHAT_MSG_ADDON") then sender = arg4 end
+        local stateReply = IsBotStateReply(message)
 
         OnWhisper(message, sender)
         
@@ -2487,13 +2549,17 @@ Mangosbot_EventFrame:SetScript("OnEvent", function(self)
             UpdateBotDebugPanel(message, sender)
         end
 
-        if (BotRoster:IsVisible() or SelectedBotPanel:IsVisible()) then
+        if (BotRoster:IsVisible() or (SelectedBotPanel ~= nil and SelectedBotPanel:IsVisible())) then
             if (string.find(message, "Hello") == 1 or string.find(message, "Goodbye") == 1) then
                 SendBotCommand(".bot list", "SAY")
                 QueryBotParty()
             end
-            UpdateGroupToolBar()
+            if (stateReply) then UpdateGroupToolBar() end
         end
+
+        -- Normal acknowledgements such as "Staying" must not rebuild every
+        -- toggle from incomplete state and clear the user's green ON markers.
+        if (not stateReply) then return end
 
         local bot = botTable[sender]
         if (bot == nil or bot["strategy"] == nil or bot["role"] == nil) then
@@ -2502,22 +2568,22 @@ Mangosbot_EventFrame:SetScript("OnEvent", function(self)
             -- replies without closing the user's pinned control panel.
             return
         end
-        local selected = GetUnitName("target")
-        if (CurrentBot ~= nil) then selected = CurrentBot end
-        if (sender == selected) then
-            SelectedBotPanel:Show()
+        local panel = SelectedBotPanels[sender]
+        if (panel ~= nil) then
+            SelectedBotPanel = panel
+            panel:Show()
 
             local tmp, class = "Unknown";
-            if (CurrentBot ~= nil and bot["class"] ~= nil) then
+            if (bot["class"] ~= nil) then
                 class = string.upper(bot["class"])
             elseif (GetUnitName("target") ~= nil) then
                 tmp,class = UnitClass("target")
             end
-            SetFrameColor(SelectedBotPanel, class)
+            SetFrameColor(panel, class)
 
             local filename = "Interface\\Addons\\Mangosbot\\Images\\role_" .. bot["role"] .. ".tga"
-            SelectedBotPanel.header.role.texture:SetTexture(filename)
-            SelectedBotPanel.header.text:SetText(sender)
+            panel.header.role.texture:SetTexture(filename)
+            panel.header.text:SetText(sender)
 
             local width = 0
             local height = 0
@@ -2525,9 +2591,9 @@ Mangosbot_EventFrame:SetScript("OnEvent", function(self)
                 local panelVisible = true
                 if (string.find(toolbarName, "CLASS_") == 1) then
                     if (string.find(string.sub(toolbarName, 7), class) == 1) then
-                        SelectedBotPanel.toolbar[toolbarName]:Show()
+                        panel.toolbar[toolbarName]:Show()
                     else
-                        SelectedBotPanel.toolbar[toolbarName]:Hide()
+                        panel.toolbar[toolbarName]:Hide()
                         panelVisible = false
                     end
                 end
@@ -2566,7 +2632,7 @@ Mangosbot_EventFrame:SetScript("OnEvent", function(self)
                     if (button["savemana"] ~= nil and bot["savemana"] ~= nil and string.find(bot["savemana"], button["savemana"]) ~= nil) then
                         toggle = true
                     end
-                    ToggleButton(SelectedBotPanel, toolbarName, buttonName, toggle)
+                    ToggleButton(panel, toolbarName, buttonName, toggle)
                     numButtons = numButtons + 1
                 end
                 if (panelVisible) then
@@ -2577,7 +2643,7 @@ Mangosbot_EventFrame:SetScript("OnEvent", function(self)
             height = height + 2
             if (width < 11) then width = 11 end
             UpdateReplyButton()
-            ResizeBotPanel(SelectedBotPanel, width * 25 + 20, height * 25 + 25)
+            ResizeBotPanel(panel, width * 25 + 20, height * 25 + 25)
         end
     end
 end)
