@@ -378,6 +378,9 @@ function ResizeBotPanel(frame, width, height)
     for toolbarName,toolbar in pairs(ToolBars) do
         frame.toolbar[toolbarName]:SetWidth(frame:GetWidth() - 10)
     end
+    if frame.maintenance ~= nil then
+        frame.maintenance:SetWidth(frame:GetWidth() - 10)
+    end
 end
 
 function CreateBotRoster()
