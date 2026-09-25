@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.2.8 - 2026-09-25
+
+### Maintenance icon rendering
+
+- Rendered maintenance textures through child frames, matching the original toolbar implementation required by the WoW 1.12 client.
+- Changed maintenance textures to the `ARTWORK` layer and classic backslash addon paths so they remain above the panel background.
+
 ## 0.2.7 - 2026-09-25
 
 ### Maintenance icons and project identity

@@ -1037,11 +1037,15 @@ function CreateMaintenanceIconButton(parent, icon, x, y, tooltip, handler, persi
         insets = { left = 0, right = 0, top = 0, bottom = 0 }
     })
     button:SetBackdropBorderColor(0, 0, 0, 0.0)
-    local image = button:CreateTexture(nil, "BACKGROUND")
-    image:SetTexture("Interface/Addons/Mangosbot/Images/" .. icon .. ".tga")
+    -- WoW 1.12 renders these textures reliably only through the same child
+    -- frame structure used by the addon's original toolbar buttons.
+    local image = CreateFrame("Frame", nil, button)
     image:SetPoint("TOPLEFT", button, "TOPLEFT", 2, -2)
     image:SetWidth(16)
     image:SetHeight(16)
+    image.texture = image:CreateTexture(nil, "ARTWORK")
+    image.texture:SetTexture("Interface\\AddOns\\Mangosbot\\Images\\" .. icon .. ".tga")
+    image.texture:SetAllPoints()
     button.image = image
     button.tooltip = tooltip
     button:SetScript("OnEnter", function()
