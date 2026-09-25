@@ -18,12 +18,13 @@ local CommandSeparator = "\\\\"
 local DropDownMenu = {}
 function SendBotCommand(text, chat, lang, channel)
     if (chat == "PARTY" and partySize() == 0) then return end
-    if (chat == "PARTY") then 
+    if (chat == "PARTY") then
         if (GetNumRaidMembers() > 0) then chat = "RAID" end
-        SendAddonMessage("", text, chat, channel)
-    else
-        SendChatMessage(text, chat, lang, channel)
     end
+    -- CMaNGOS Playerbot reads ordinary party/raid chat and whispers.  The
+    -- original addon used SendAddonMessage for group commands, a private
+    -- protocol used by ike3's aiPlayerbot but ignored by classic Playerbot.
+    SendChatMessage(text, chat, lang, channel)
 end
 function SendBotAddonCommand(text, chat, lang, channel)
     SendBotCommand("#a "..text, chat, lang, channel)
@@ -138,25 +139,25 @@ function ToolBarButtonOnClick(btn, visual)
 
     if (btn["group"]) then
         local delay = 0
-        local first = true
-        local combined = ""
         for key, command in orderedPairs(btn["command"]) do
-            combined = combined..command..CommandSeparator
-        end
-        combined = string.sub(combined, 1, string.len(combined) - 2)
-        wait(0, function(combined) SendBotCommand(combined, "PARTY") end, combined)
-        if (btn["tooltip"] ~= nil) then
-            wait(delay + 1, function(command) SendBotCommand(command, "PARTY") end, btn["tooltip"])
+            if (command ~= nil and string.len(command) > 0) then
+                wait(delay, function(command) SendBotCommand(command, "PARTY") end, command)
+                delay = delay + 0.2
+            end
         end
     else
-        local bot = GetUnitName("target")
-        if (bot == nil) then bot = CurrentBot end
-        local combined = ""
+        -- A bot chosen in the roster must take precedence over whatever the
+        -- player happens to have targeted in the world.
+        local bot = CurrentBot
+        if (bot == nil) then bot = GetUnitName("target") end
+        if (bot == nil) then return end
+        local delay = 0
         for key, command in orderedPairs(btn["command"]) do
-            combined = combined..command..CommandSeparator
+            if (command ~= nil and string.len(command) > 0) then
+                wait(delay, function(command, bot) SendBotCommand(command, "WHISPER", nil, bot) end, command, bot)
+                delay = delay + 0.2
+            end
         end
-        combined = string.sub(combined, 1, string.len(combined) - 2)
-        wait(0, function(combined, bot) SendBotCommand(combined, "WHISPER", nil, bot) end, combined, bot)
     end
 end
 
@@ -563,7 +564,7 @@ function CreateMovementToolBar(frame, y, name, group, x, spacing, register)
     local tb = {
         ["follow_master"] = {
             icon = "follow_master",
-            command = {[0] = "#a follow", [1] = "#a nc ?", [2] = "#a co ?"},
+            command = {[0] = "follow"},
             strategy = "follow",
             tooltip = "Follow me",
             index = 0,
@@ -572,7 +573,7 @@ function CreateMovementToolBar(frame, y, name, group, x, spacing, register)
         },
         ["stay"] = {
             icon = "stay",
-            command = {[0] = "#a stay", [1] = "#a nc ?", [2] = "#a co ?"},
+            command = {[0] = "stay"},
             strategy = "stay",
             tooltip = "Stay in place",
             index = 1,
@@ -584,7 +585,7 @@ function CreateMovementToolBar(frame, y, name, group, x, spacing, register)
     if (not group) then
         tb["runaway"] = {
             icon = "flee",
-            command = {[0] = "#a co ~runaway,?"},
+            command = {[0] = "orders combat passive", [1] = "follow"},
             strategy = "runaway",
             tooltip = "Run away from mobs",
             index = index,
@@ -595,7 +596,7 @@ function CreateMovementToolBar(frame, y, name, group, x, spacing, register)
 
     tb["flee_passive"] = {
         icon = "flee_passive",
-        command = {[0] = "#a flee", [1] = "#a nc ?", [2] = "#a co ?"},
+        command = {[0] = "orders combat passive", [1] = "follow"},
         strategy = "",
         tooltip = "Ignore everything and follow master",
         index = index,
@@ -606,7 +607,7 @@ function CreateMovementToolBar(frame, y, name, group, x, spacing, register)
 
 	tb["passive"] = {
 		icon = "passive",
-		command = {[0] = "nc +passive,?", [1] = "co +passive,?"},
+		command = {[0] = "orders combat passive"},
 		strategy = "passive",
 		tooltip = "Don't rush",
 		index = index,
@@ -617,7 +618,7 @@ function CreateMovementToolBar(frame, y, name, group, x, spacing, register)
     if (group) then
         tb["loot"] = {
             icon = "loot",
-            command = {[0] = "d add all loot", [1] = "d loot"},
+            command = {[0] = "collect combat loot profession quest"},
             strategy = "",
             tooltip = "Loot everything",
             index = index,
@@ -626,7 +627,7 @@ function CreateMovementToolBar(frame, y, name, group, x, spacing, register)
         index = index + 1
         tb["attack"] = {
             icon = "dps",
-            command = {[0] = "d attack my target"},
+            command = {[0] = "attack"},
             strategy = "",
             tooltip = "Attack my target",
             index = index,
@@ -635,7 +636,7 @@ function CreateMovementToolBar(frame, y, name, group, x, spacing, register)
         index = index + 1
         tb["pull"] = {
             icon = "tank_assist",
-            command = {[0] = "#a @dps flee", [1] = "#a @heal flee", [2] = "#a @tank d attack my target"},
+            command = {[0] = "pull"},
             strategy = "",
             tooltip = "Pull",
             index = index,
@@ -660,7 +661,7 @@ function CreateFormationToolBar(frame, y, name, group, x, spacing, register)
     return CreateToolBar(frame, -y, name, {
         ["near"] = {
             icon = "formation_near",
-            command = {[0] = "formation near"},
+            command = {[0] = "follow near"},
             formation = "near",
             tooltip = "Half-circle",
             index = 0,
@@ -668,7 +669,7 @@ function CreateFormationToolBar(frame, y, name, group, x, spacing, register)
         },
         ["melee"] = {
             icon = "formation_melee",
-            command = {[0] = "formation melee"},
+            command = {[0] = "follow near"},
             formation = "melee",
             tooltip = "Similar to pets",
             index = 1,
@@ -676,7 +677,7 @@ function CreateFormationToolBar(frame, y, name, group, x, spacing, register)
         },
         ["arrow"] = {
             icon = "formation_arrow",
-            command = {[0] = "formation arrow"},
+            command = {[0] = "follow reset"},
             formation = "arrow",
             tooltip = "Tank first, dps/healer last",
             index = 2,
@@ -684,7 +685,7 @@ function CreateFormationToolBar(frame, y, name, group, x, spacing, register)
         },
         ["far"] = {
             icon = "formation_far",
-            command = {[0] = "formation far"},
+            command = {[0] = "follow far"},
             formation = "far",
             tooltip = "Maintain a distance",
             index = 3,
@@ -692,7 +693,7 @@ function CreateFormationToolBar(frame, y, name, group, x, spacing, register)
         },
         ["chaos"] = {
             icon = "formation_chaos",
-            command = {[0] = "formation chaos"},
+            command = {[0] = "follow auto"},
             formation = "chaos",
             tooltip = "Move freely",
             index = 4,
@@ -738,27 +739,50 @@ function CreateStanceToolBar(frame, y, name, group, x, spacing, register)
     }, x, spacing, register)
 end
 
+function StartUseItem(group)
+    local editBox = getglobal("ChatFrameEditBox")
+    editBox:Show()
+    editBox:SetFocus()
+    if (group) then
+        if (GetNumRaidMembers() > 0) then
+            editBox:SetText("/ra use ")
+        else
+            editBox:SetText("/p use ")
+        end
+    else
+        local name = CurrentBot
+        if (name == nil) then name = GetUnitName("target") end
+        if (name ~= nil) then editBox:SetText("/w " .. name .. " use ") end
+    end
+end
+
+function CMaNGOSAutomaticFeature(feature)
+    print("|cffffcc00MangosBot:|r " .. feature .. " is automatic in CMaNGOS Playerbot.")
+end
+
 function CreateGenericNonCombatToolBar(frame, y, name, group, x, spacing, register)
     return CreateToolBar(frame, -y, name, {
         ["food"] = {
             icon = "food",
-            command = {[0] = "nc ~food,?"},
+            command = {[0] = ""},
             strategy = "food",
-            tooltip = "Use food and drinks",
+            tooltip = "Use food/drink: click, then shift-click the item and press Enter",
+            handler = function() StartUseItem(group) end,
             index = 0,
             group = group
         },
         ["buff"] = {
             icon = "bdps",
-            command = {[0] = "nc ~buff,?"},
+            command = {[0] = ""},
             strategy = "buff",
-            tooltip = "Buff party members",
+            tooltip = "Buff party members (automatic in CMaNGOS)",
+            handler = function() CMaNGOSAutomaticFeature("Buffing") end,
             index = 1,
             group = group
         },
         ["loot"] = {
             icon = "loot",
-            command = {[0] = "nc ~loot,?"},
+            command = {[0] = "collect combat loot quest"},
             strategy = "loot",
             tooltip = "Enable looting",
             index = 2,
@@ -766,7 +790,7 @@ function CreateGenericNonCombatToolBar(frame, y, name, group, x, spacing, regist
         },
         ["gather"] = {
             icon = "gather",
-            command = {[0] = "nc ~gather,?"},
+            command = {[0] = "collect profession objects"},
             strategy = "gather",
             tooltip = "Gather herbs, ore, etc.",
             index = 3,
@@ -827,7 +851,7 @@ function CreateGenericCombatToolBar(frame, y, name, group, x, spacing, register)
         },
         ["cc"] = {
             icon = "cc",
-            command = {[0] = "co ~cc,?"},
+            command = {[0] = "neutralize"},
             strategy = "cc",
             tooltip = "Use crowd control abilities",
             index = 6,
@@ -932,7 +956,7 @@ function CreateSelectedBotPanel()
         },
         ["loot"] = {
             icon = "loot",
-            command = {[0] = "d add all loot", [1] = "d loot"},
+            command = {[0] = "collect combat loot profession quest"},
             strategy = "",
             tooltip = "Loot everything",
             index = 2
@@ -946,21 +970,21 @@ function CreateSelectedBotPanel()
         },
         ["revive"] = {
             icon = "revive",
-            command = {[0] = "revive", [1] = "d revive from corpse"},
+            command = {[0] = "follow"},
             strategy = "",
             tooltip = "Revive from corpse",
             index = 4
         },
         ["sell"] = {
             icon = "sell",
-            command = {[0] = "s *"},
+            command = {[0] = "sell all"},
             strategy = "",
             tooltip = "Sell vendor trash",
             index = 5
         },
         ["talk"] = {
             icon = "talk",
-            command = {[0] = "talk", [0] = "accept *"},
+            command = {[0] = "quest fetch"},
             strategy = "",
             tooltip = "Talk",
             index = 6
@@ -1000,14 +1024,14 @@ function CreateSelectedBotPanel()
         },
         ["spells"] = {
             icon = "spells",
-            command = {[0] = "spells +"},
+            command = {[0] = "spells"},
             strategy = "",
             tooltip = "Show crafting",
             index = 3
         },
         ["equip"] = {
             icon = "equip",
-            command = {[0] = "e ?"},
+            command = {[0] = "equip info"},
             strategy = "",
             tooltip = "Show equipment",
             index = 4
@@ -1851,21 +1875,58 @@ local function fmod(a,b)
 end
 
 function QueryBotParty()
-    wait(0.1, function() SendBotCommand("#a ll ?"..CommandSeparator.."#a formation ?"..CommandSeparator.."#a stance ?"..CommandSeparator.."#a co ?"..CommandSeparator.."#a nc ?"..CommandSeparator.."#a save mana ?", "PARTY") end)
+    -- CMaNGOS Playerbot has no aiPlayerbot strategy-query protocol.
 end
 
 function QuerySelectedBot(name)
-    wait(0.1, function() SendBotCommand("#a formation ?"..CommandSeparator.."#a stance ?"..CommandSeparator.."#a ll ?"..CommandSeparator.."#a co ?"..CommandSeparator.."#a nc ?"..CommandSeparator.."#a save mana ?"..CommandSeparator.."#a rti ?", "WHISPER", nil, name) end)
+    -- The panel is populated from the roster and shown locally.  Sending the
+    -- old '#a ... ?' queries only produces unknown commands on CMaNGOS.
+end
+
+function ShowSelectedBot(name)
+    if (name == nil or botTable[name] == nil) then return end
+
+    local bot = botTable[name]
+    if (bot["strategy"] == nil) then bot["strategy"] = {nc = {}, co = {}} end
+    if (bot["role"] == nil) then bot["role"] = "dps" end
+
+    local class = string.upper(bot["class"] or "")
+    SetFrameColor(SelectedBotPanel, class)
+    SelectedBotPanel.header.role.texture:SetTexture("Interface/Addons/Mangosbot/Images/role_" .. bot["role"] .. ".tga")
+    SelectedBotPanel.header.text:SetText(name)
+
+    local width = 0
+    local height = 0
+    for toolbarName,toolbar in pairs(ToolBars) do
+        local panelVisible = true
+        if (string.find(toolbarName, "CLASS_") == 1) then
+            if (class ~= "" and string.find(string.sub(toolbarName, 7), class) == 1) then
+                SelectedBotPanel.toolbar[toolbarName]:Show()
+            else
+                SelectedBotPanel.toolbar[toolbarName]:Hide()
+                panelVisible = false
+            end
+        end
+        if (panelVisible) then
+            local numButtons = tablelength(toolbar)
+            height = height + 1
+            if (width < numButtons) then width = numButtons end
+        end
+    end
+    ResizeBotPanel(SelectedBotPanel, width * 25 + 20, height * 25 + 25)
+    SelectedBotPanel:Show()
 end
 
 Mangosbot_EventFrame:SetScript("OnEvent", function(self)
     if (event == "PLAYER_TARGET_CHANGED") then
         local name = GetUnitName("target")
         local self = GetUnitName("player")
-        if (CurrentBot == nil and (name == nil or not UnitExists("target") or UnitIsEnemy("target", "player") or not UnitIsPlayer("target") or name == self)) then
-            SelectedBotPanel:Hide()
-        else
-            if (CurrentBot ~= name) then CurrentBot = nil end
+        -- Keep a roster-selected bot pinned while the player changes targets
+        -- in combat.  A valid bot target may select/open a panel, but invalid
+        -- or enemy targets must never close an already open one.
+        if (CurrentBot == nil and name ~= nil and UnitExists("target") and not UnitIsEnemy("target", "player") and UnitIsPlayer("target") and name ~= self and botTable[name] ~= nil) then
+            CurrentBot = name
+            ShowSelectedBot(CurrentBot)
             QuerySelectedBot(name)
         end
     end
@@ -1903,13 +1964,29 @@ Mangosbot_EventFrame:SetScript("OnEvent", function(self)
                 allBots = allBots .. key
 
                 item.text:SetText(key)
+                local selectedItem = item
                 item.cls["key"] = key
                 item.cls:SetScript("OnClick", function()
-                    if (CurrentBot == item.cls["key"]) then
+                    if (CurrentBot == selectedItem.cls["key"]) then
                         CurrentBot = nil
                         SelectedBotPanel:Hide()
                     else
-                        CurrentBot = item.cls["key"]
+                        CurrentBot = selectedItem.cls["key"]
+                        ShowSelectedBot(CurrentBot)
+                        QuerySelectedBot(CurrentBot)
+                    end
+                end)
+                -- The name/header area now selects the bot too; previously
+                -- only the tiny 16x16 class icon was clickable.
+                item:EnableMouse(true)
+                item["key"] = key
+                item:SetScript("OnMouseDown", function()
+                    if (CurrentBot == selectedItem["key"]) then
+                        CurrentBot = nil
+                        SelectedBotPanel:Hide()
+                    else
+                        CurrentBot = selectedItem["key"]
+                        ShowSelectedBot(CurrentBot)
                         QuerySelectedBot(CurrentBot)
                     end
                 end)
@@ -2177,7 +2254,9 @@ Mangosbot_EventFrame:SetScript("OnEvent", function(self)
 
         local bot = botTable[sender]
         if (bot == nil or bot["strategy"] == nil or bot["role"] == nil) then
-            SelectedBotPanel:Hide()
+            -- Ordinary CMaNGOS replies do not contain the aiPlayerbot
+            -- strategy state expected by the original addon.  Ignore such
+            -- replies without closing the user's pinned control panel.
             return
         end
         local selected = GetUnitName("target")
@@ -2186,7 +2265,9 @@ Mangosbot_EventFrame:SetScript("OnEvent", function(self)
             SelectedBotPanel:Show()
 
             local tmp, class = "Unknown";
-            if (GetUnitName("target") ~= nil) then
+            if (CurrentBot ~= nil and bot["class"] ~= nil) then
+                class = string.upper(bot["class"])
+            elseif (GetUnitName("target") ~= nil) then
                 tmp,class = UnitClass("target")
             end
             SetFrameColor(SelectedBotPanel, class)
