@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.2.5 - 2026-09-25
+
+### Complete talent build parsing
+
+- Accepted named talent builds without a `pve` or `pvp` prefix, including warrior variants such as `arms axes`, `fury slam` and `furyprot`.
+- Accepted the trailing period used by the server after the final point distribution.
+- Increased the no-response fallback from five to fifteen seconds for slower bot replies.
+
 ## 0.2.4 - 2026-09-25
 
 ### Panel activation

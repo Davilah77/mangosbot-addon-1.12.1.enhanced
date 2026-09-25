@@ -102,7 +102,7 @@ function RequestBotTalentList(bot, openWhenReady)
     PendingTalentListBots[bot] = true
     SendBotCommand("talents list", "WHISPER", nil, bot)
     local revision = botTable[bot].talentListRevision
-    wait(5.0, function(name, expectedRevision)
+    wait(15.0, function(name, expectedRevision)
         if (PendingTalentListBots[name] and botTable[name] ~= nil and botTable[name].talentListRevision == expectedRevision) then
             FinalizeTalentList(name)
         end
@@ -2237,13 +2237,16 @@ function ParseTalentBuildList(message, sender)
         -- every supported representation to the command format 17-34-0.
         buildName = string.gsub(buildName, "h(%d+)h", "%1")
         buildName = string.gsub(buildName, "(%d+)h", "%1")
-        local pointsStart, pointsEnd, tree1, tree2, tree3 = string.find(buildName, " %((%d+)[/%-](%d+)[/%-](%d+)%)$")
+        local pointsStart, pointsEnd, tree1, tree2, tree3 = string.find(buildName, " %((%d+)[/%-](%d+)[/%-](%d+)%)%.?$")
         local buildCommand = buildName
         if (pointsStart ~= nil) then
             buildCommand = tree1 .. "-" .. tree2 .. "-" .. tree3
             buildName = trim2(string.sub(buildName, 1, pointsStart - 1)) .. " (" .. buildCommand .. ")"
         end
-        if (string.find(buildName, "^pve ") == 1 or string.find(buildName, "^pvp ") == 1) then
+        -- Warrior lists also contain valid named builds without a pve/pvp
+        -- prefix (arms axes, fury slam, furyprot, and others). The point
+        -- distribution is the reliable marker that an entry is selectable.
+        if (pointsStart ~= nil) then
             if (AddTalentBuild(sender, buildName, buildCommand)) then found = true end
         end
     end
