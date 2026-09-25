@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.2.6 - 2026-09-25
+
+### Control-state feedback
+
+- Made formations mutually exclusive: selecting one clears the other formation highlights and leaves only the active formation green.
+- Changed one-shot group actions to flash red for 1.5 seconds and then return to their normal state.
+- Kept genuinely persistent strategies, including the loot toggle, as green ON/OFF controls.
+
 ## 0.2.5 - 2026-09-25
 
 ### Complete talent build parsing

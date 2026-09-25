@@ -181,8 +181,11 @@ function CreateToolBar(frame, y, name, buttons, x, spacing, register)
         btn["group"] = button["group"]
         btn["handler"] = button["handler"]
         btn["strategy"] = button["strategy"]
-        btn["stateful"] = button["strategy"] ~= nil and button["strategy"] ~= ""
+        btn["formation"] = button["formation"]
+        btn["oneShot"] = button["oneShot"] == true
+        btn["stateful"] = button["strategy"] ~= nil and button["strategy"] ~= "" and not btn["oneShot"]
         btn["isActive"] = false
+        btn["toolbarFrame"] = tb
         btn["ToolBarButtonOnClick"] = ToolBarButtonOnClick;
         btn:SetScript("OnClick", function()
             if (frame.botName ~= nil) then
@@ -238,7 +241,14 @@ function ToolBarButtonOnClick(btn, visual)
         return
     end
 
-    if (visual and btn["stateful"]) then
+    if (visual and btn["formation"] ~= nil) then
+        for _, formationButton in pairs(btn["toolbarFrame"].buttons) do
+            formationButton["isActive"] = false
+            formationButton:SetBackdropBorderColor(0, 0, 0, 0.0)
+        end
+        btn["isActive"] = true
+        btn:SetBackdropBorderColor(0.2, 1.0, 0.2, 1.0)
+    elseif (visual and btn["stateful"]) then
         btn["isActive"] = not btn["isActive"]
         if (btn["isActive"]) then
             btn:SetBackdropBorderColor(0.2, 1.0, 0.2, 1.0)
@@ -247,6 +257,13 @@ function ToolBarButtonOnClick(btn, visual)
         end
     elseif (visual) then
         btn:SetBackdropBorderColor(0.8, 0.2, 0.2, 1.0)
+        btn["flashToken"] = (btn["flashToken"] or 0) + 1
+        local flashToken = btn["flashToken"]
+        wait(1.5, function(button, expectedToken)
+            if (button["flashToken"] == expectedToken and not button["isActive"]) then
+                button:SetBackdropBorderColor(0, 0, 0, 0.0)
+            end
+        end, btn, flashToken)
     end
 
     if (btn["emote"] ~= nil) then
@@ -686,6 +703,7 @@ function CreateMovementToolBar(frame, y, name, group, x, spacing, register)
             tooltip = "Follow me",
             index = 0,
             group = group,
+            oneShot = group,
             emote = "follow"
         },
         ["stay"] = {
@@ -695,6 +713,7 @@ function CreateMovementToolBar(frame, y, name, group, x, spacing, register)
             tooltip = "Stay in place",
             index = 1,
             group = group,
+            oneShot = group,
             emote = "wait"
         }
     }
@@ -718,6 +737,7 @@ function CreateMovementToolBar(frame, y, name, group, x, spacing, register)
         tooltip = "Ignore everything and follow master",
         index = index,
         group = group,
+        oneShot = group,
         emote = "flee"
     }
     index = index + 1
@@ -728,7 +748,8 @@ function CreateMovementToolBar(frame, y, name, group, x, spacing, register)
 		strategy = "passive",
 		tooltip = "Don't rush",
 		index = index,
-        group = group
+        group = group,
+        oneShot = group
 	}
     index = index + 1
 
