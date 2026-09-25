@@ -1080,13 +1080,13 @@ function CreateMaintenancePanel(frame, y)
     panel:SetPoint("TOPLEFT", frame, "TOPLEFT", 5, -y)
     panel:SetWidth(280)
     panel:SetHeight(22)
-    panel:SetBackdropColor(0, 0, 0, 1.0)
     panel:SetBackdrop({
         bgFile="Interface/ChatFrame/ChatFrameBackground",
         edgeFile="Interface/ChatFrame/ChatFrameBackground",
         tile = false, tileSize = 16, edgeSize = 0,
         insets = { left = 0, right = 0, top = 0, bottom = 0 }
     })
+    panel:SetBackdropColor(0, 0, 0, 1.0)
 
     panel.resetTalentsButton = CreateMaintenanceIconButton(panel, "maintenance_reset_talents", 0, 0,
         "Reset Talents: clear this bot's talents, then recalculate its stats.", ResetCurrentBotTalents, false)

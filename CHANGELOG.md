@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.2.10 - 2026-09-25
+
+### Maintenance bar background
+
+- Applied the black backdrop colour after creating the backdrop, preventing the WoW 1.12 client from resetting the compact maintenance bar to white.
+
 ## 0.2.9 - 2026-09-25
 
 ### Compact maintenance bar and roster state
