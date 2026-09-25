@@ -1,5 +1,18 @@
 # Changelog
 
+## 0.2.0-beta.2 - 2026-09-25
+
+### Talent controls
+
+- Changed `List Talents` so it only refreshes the cached specialization list; it no longer opens the selection menu.
+- Stripped WoW colour and hyperlink escape sequences from parsed talent names before sending a selection back to the bot.
+- Kept `Choose Spec` as the only control that opens the specialization menu.
+
+### Chat and individual state
+
+- Extended `Replies: OFF` to hide the local echo of outgoing bot whispers.
+- Made the individual `save mana` controls store and display their level per bot while continuing to whisper only the selected bot.
+
 ## 0.2.0-beta.1 - 2026-09-25
 
 ### Bot maintenance and talents

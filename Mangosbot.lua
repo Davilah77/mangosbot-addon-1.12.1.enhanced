@@ -1,6 +1,7 @@
 local Mangosbot_EventFrame = CreateFrame("Frame")
 Mangosbot_EventFrame:RegisterEvent("PLAYER_TARGET_CHANGED")
 Mangosbot_EventFrame:RegisterEvent("CHAT_MSG_WHISPER")
+Mangosbot_EventFrame:RegisterEvent("CHAT_MSG_WHISPER_INFORM")
 Mangosbot_EventFrame:RegisterEvent("CHAT_MSG_ADDON")
 Mangosbot_EventFrame:RegisterEvent("CHAT_MSG_SYSTEM")
 Mangosbot_EventFrame:RegisterEvent("CHAT_MSG_PARTY")
@@ -19,6 +20,19 @@ local ToolBars = {}
 local GroupToolBars = {}
 local CommandSeparator = "\\\\"
 local DropDownMenu = {}
+
+function SanitizeBotCommand(text)
+    if (text == nil) then return text end
+    -- Playerbot may decorate talent-list replies with WoW colour/link escape
+    -- sequences. Those sequences are valid in received chat but WoW 1.12
+    -- rejects them when the same text is sent back as a command.
+    text = string.gsub(text, "|c%x%x%x%x%x%x%x%x", "")
+    text = string.gsub(text, "|r", "")
+    text = string.gsub(text, "|H.-|h(.-)|h", "%1")
+    text = string.gsub(text, "|", "")
+    return text
+end
+
 function SendBotCommand(text, chat, lang, channel)
     if (chat == "PARTY" and partySize() == 0) then return end
     if (chat == "PARTY") then
@@ -27,7 +41,7 @@ function SendBotCommand(text, chat, lang, channel)
     -- CMaNGOS Playerbot reads ordinary party/raid chat and whispers.  The
     -- original addon used SendAddonMessage for group commands, a private
     -- protocol used by ike3's aiPlayerbot but ignored by classic Playerbot.
-    SendChatMessage(text, chat, lang, channel)
+    SendChatMessage(SanitizeBotCommand(text), chat, lang, channel)
 end
 function SendBotAddonCommand(text, chat, lang, channel)
     SendBotCommand("#a "..text, chat, lang, channel)
@@ -83,6 +97,19 @@ function ListCurrentBotTalents()
     PendingTalentListBot = bot
     TalentMenuOpenScheduled = false
     SendBotCommand("talents list", "WHISPER", nil, bot)
+    wait(1.0, function(name)
+        if (PendingTalentListBot ~= name) then return end
+        PendingTalentListBot = nil
+        local count = 0
+        if (botTable[name] ~= nil and botTable[name].talentBuilds ~= nil) then
+            count = tablelength(botTable[name].talentBuilds)
+        end
+        if (count > 0) then
+            DEFAULT_CHAT_FRAME:AddMessage("MangosBot: " .. count .. " talent specializations loaded for " .. name .. ".")
+        else
+            DEFAULT_CHAT_FRAME:AddMessage("MangosBot: no talent specializations received from " .. name .. ".")
+        end
+    end, bot)
 end
 
 function ResetCurrentBotTalents()
@@ -933,13 +960,15 @@ end
 function CreateSaveManaToolBar(frame, y, name, group, x, spacing, register)
     local buttons = {};
     for i = 1, 5 do
+        local level = i
         buttons["savemana"..i] = {
             icon = "savemana"..i,
             command = {[0] = "save mana "..i},
             tooltip = "Save mana level: "..(i>1 and "#"..i or "disabled"),
             index = i - 1,
             group = group,
-            savemana = i
+            savemana = i,
+            handler = not group and function() SetCurrentBotSaveMana(level) end or nil
         }
     end
     return CreateToolBar(frame, -y, name, buttons, x, spacing, register)
@@ -2017,6 +2046,17 @@ function OpenTalentMenuForCurrentBot()
     OpenTalentMenu(GetCurrentBotName())
 end
 
+function SetCurrentBotSaveMana(level)
+    local bot = GetCurrentBotName()
+    if (bot == nil or level == nil) then return end
+    SendBotCommand("save mana " .. level, "WHISPER", nil, bot)
+    if (botTable[bot] == nil) then botTable[bot] = {} end
+    botTable[bot].savemana = tostring(level)
+    for i = 1, 5 do
+        ToggleButton(SelectedBotPanel, "savemana", "savemana" .. i, i == level)
+    end
+end
+
 
 botTable = {}
 SelectedBotPanel = CreateSelectedBotPanel();
@@ -2092,7 +2132,7 @@ function ParseTalentBuildList(message, sender)
     local found = false
     local entries = splitString2(message, ", ")
     for _, entry in pairs(entries) do
-        local buildName = trim2(entry)
+        local buildName = trim2(SanitizeBotCommand(entry))
         -- Keep descriptive qualifiers such as "(mm/sv)" because they are
         -- part of the configured build name.  Only remove the final point
         -- distribution displayed by the server, for example "(2/31/18)".
@@ -2101,14 +2141,6 @@ function ParseTalentBuildList(message, sender)
         if (string.find(buildName, "^pve ") == 1 or string.find(buildName, "^pvp ") == 1) then
             if (AddTalentBuild(sender, buildName)) then found = true end
         end
-    end
-    if (found and not TalentMenuOpenScheduled) then
-        TalentMenuOpenScheduled = true
-        wait(0.5, function(bot)
-            TalentMenuOpenScheduled = false
-            PendingTalentListBot = nil
-            OpenTalentMenu(bot)
-        end, sender)
     end
     return found
 end
@@ -2128,7 +2160,7 @@ end
 
 function ShouldHideBotChat(chatEvent, message, sender)
     if (BotRepliesEnabled() or sender == nil or botTable[sender] == nil) then return false end
-    if (chatEvent == "CHAT_MSG_WHISPER") then return true end
+    if (chatEvent == "CHAT_MSG_WHISPER" or chatEvent == "CHAT_MSG_WHISPER_INFORM") then return true end
     if (chatEvent == "CHAT_MSG_PARTY" or chatEvent == "CHAT_MSG_RAID" or chatEvent == "CHAT_MSG_GUILD") then
         return IsBotGroupReply(message)
     end
