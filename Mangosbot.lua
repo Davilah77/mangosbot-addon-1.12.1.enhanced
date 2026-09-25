@@ -1079,21 +1079,27 @@ function CreateMaintenancePanel(frame, y)
     panel.ownerFrame = frame
     panel:SetPoint("TOPLEFT", frame, "TOPLEFT", 5, -y)
     panel:SetWidth(280)
-    panel:SetHeight(45)
+    panel:SetHeight(22)
+    panel:SetBackdropColor(0, 0, 0, 1.0)
+    panel:SetBackdrop({
+        bgFile="Interface/ChatFrame/ChatFrameBackground",
+        edgeFile="Interface/ChatFrame/ChatFrameBackground",
+        tile = false, tileSize = 16, edgeSize = 0,
+        insets = { left = 0, right = 0, top = 0, bottom = 0 }
+    })
 
-    panel.initButton = CreateMaintenanceIconButton(panel, "maintenance_match_level", 0, 0,
-        "Match Level: match this bot to your level and initialize its basic equipment and abilities.", InitializeCurrentBot, false)
-    panel.gearButton = CreateMaintenanceIconButton(panel, "maintenance_gear", 27, 0,
-        "Gear: generate level- and specialization-appropriate equipment for this bot.", GearCurrentBot, false)
-    panel.replyButton = CreateMaintenanceIconButton(panel, "maintenance_replies", 54, 0,
-        "Bot command replies: OFF", ToggleBotReplies, true)
-
-    panel.resetTalentsButton = CreateMaintenanceIconButton(panel, "maintenance_reset_talents", 0, -23,
+    panel.resetTalentsButton = CreateMaintenanceIconButton(panel, "maintenance_reset_talents", 0, 0,
         "Reset Talents: clear this bot's talents, then recalculate its stats.", ResetCurrentBotTalents, false)
-    panel.listTalentsButton = CreateMaintenanceIconButton(panel, "maintenance_list_talents", 27, -23,
+    panel.listTalentsButton = CreateMaintenanceIconButton(panel, "maintenance_list_talents", 27, 0,
         "List Talents: ask the bot for every available talent build.", ListCurrentBotTalents, false)
-    panel.chooseTalentButton = CreateMaintenanceIconButton(panel, "maintenance_choose_spec", 54, -23,
+    panel.chooseTalentButton = CreateMaintenanceIconButton(panel, "maintenance_choose_spec", 54, 0,
         "Choose Spec: choose one of the talent builds returned by List Talents.", function() OpenTalentMenuForCurrentBot() end, false)
+    panel.initButton = CreateMaintenanceIconButton(panel, "maintenance_match_level", 81, 0,
+        "Match Level: match this bot to your level and initialize its basic equipment and abilities.", InitializeCurrentBot, false)
+    panel.gearButton = CreateMaintenanceIconButton(panel, "maintenance_gear", 108, 0,
+        "Gear: generate level- and specialization-appropriate equipment for this bot.", GearCurrentBot, false)
+    panel.replyButton = CreateMaintenanceIconButton(panel, "maintenance_replies", 135, 0,
+        "Bot command replies: OFF", ToggleBotReplies, true)
 
     frame.maintenance = panel
     UpdateReplyButton()
@@ -1268,7 +1274,7 @@ function CreateSelectedBotPanel(botName)
     y = y + 25
     CreateMaintenancePanel(frame, y)
 
-    y = y + 50
+    y = y + 25
     CreateFormationToolBar(frame, y, "formation", false, 5, 5, true)
 
     y = y + 25
@@ -2612,7 +2618,8 @@ Mangosbot_EventFrame:SetScript("OnEvent", function(self)
                 genericCombatToolBar:Hide()
             end
 
-            UpdateGroupToolBar()
+            -- Reopening the roster must not clear optimistic ON/OFF markers.
+            -- Authoritative strategy replies still refresh them separately.
             BotRoster:SetWidth(width)
             BotRoster:SetHeight(y + 22)
         end
@@ -2866,6 +2873,7 @@ end
 
 function OnSystemMessage(message)
     if (string.find(message, 'Bot roster: ') == 1) then
+        local previousBotTable = botTable
         botTable = {}
         local text = string.sub(message, 13)
         local splitted = splitString2(text, ", ")
@@ -2876,9 +2884,7 @@ function OnSystemMessage(message)
             local name = string.sub(line, 2, pos - 1)
             local cls = string.sub(line, pos + 1)
 
-            if (botTable[name] == nil) then
-                botTable[name] = {}
-            end
+            botTable[name] = previousBotTable[name] or {}
             botTable[name]["class"] = cls
             botTable[name]["online"] = (on == "+")
         end

@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.2.9 - 2026-09-25
+
+### Compact maintenance bar and roster state
+
+- Moved all six maintenance icons to one black toolbar in this order: Reset Talents, List Talents, Choose Spec, Match Level, Gear and Replies.
+- Removed the unused second maintenance row and reclaimed its vertical space.
+- Preserved each bot's known strategies, formation, mana level and other UI state when reopening the general roster.
+
 ## 0.2.8 - 2026-09-25
 
 ### Maintenance icon rendering
