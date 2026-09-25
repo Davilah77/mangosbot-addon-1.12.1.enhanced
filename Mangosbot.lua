@@ -1094,17 +1094,17 @@ function CreateMaintenancePanel(frame, y)
     })
     panel:SetBackdropBorderColor(0, 0, 0, 1.0)
 
-    panel.resetTalentsButton = CreateMaintenanceIconButton(panel, "maintenance_reset_talents", 0, 0,
+    panel.resetTalentsButton = CreateMaintenanceIconButton(panel, "enhanced_reset_skills", 0, 0,
         "Reset Talents: clear this bot's talents, then recalculate its stats.", ResetCurrentBotTalents, false)
-    panel.listTalentsButton = CreateMaintenanceIconButton(panel, "maintenance_list_talents", 27, 0,
+    panel.listTalentsButton = CreateMaintenanceIconButton(panel, "enhanced_list_talents", 27, 0,
         "List Talents: ask the bot for every available talent build.", ListCurrentBotTalents, false)
-    panel.chooseTalentButton = CreateMaintenanceIconButton(panel, "maintenance_choose_spec", 54, 0,
+    panel.chooseTalentButton = CreateMaintenanceIconButton(panel, "enhanced_choose_spec", 54, 0,
         "Choose Spec: choose one of the talent builds returned by List Talents.", function() OpenTalentMenuForCurrentBot() end, false)
-    panel.initButton = CreateMaintenanceIconButton(panel, "maintenance_match_level", 81, 0,
+    panel.initButton = CreateMaintenanceIconButton(panel, "enhanced_match_level_skills", 81, 0,
         "Match Level: match this bot to your level and initialize its basic equipment and abilities.", InitializeCurrentBot, false)
-    panel.gearButton = CreateMaintenanceIconButton(panel, "maintenance_gear", 108, 0,
+    panel.gearButton = CreateMaintenanceIconButton(panel, "enhanced_gear", 108, 0,
         "Gear: generate level- and specialization-appropriate equipment for this bot.", GearCurrentBot, false)
-    panel.replyButton = CreateMaintenanceIconButton(panel, "maintenance_replies", 135, 0,
+    panel.replyButton = CreateMaintenanceIconButton(panel, "enhanced_replies", 135, 0,
         "Bot command replies: OFF", ToggleBotReplies, true)
 
     frame.maintenance = panel

@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.2.11 - 2026-09-25
+
+### Custom maintenance icons
+
+- Replaced all six enhanced maintenance controls with new dedicated artwork: Reset Talents, List Talents, Choose Spec, Match Level, Gear and Replies.
+- Stored the new artwork under unique internal names to avoid overwriting similarly named icons used by the original addon.
+
 ## 0.2.10 - 2026-09-25
 
 ### Maintenance bar background
