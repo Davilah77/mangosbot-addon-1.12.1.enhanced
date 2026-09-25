@@ -1,4 +1,4 @@
-# Mangosbot Addon 1.12.1 Fixed
+# Mangosbot Addon 1.12.1 Enhanced
 
 A community-maintained fork of [ike3/mangosbot-addon](https://github.com/ike3/mangosbot-addon), based on its `1.12` branch and adapted for the classic CMaNGOS Playerbot command interface.
 
@@ -43,7 +43,7 @@ See [CHANGELOG.md](CHANGELOG.md) for the detailed command mappings.
 - `/bot` toggles the bot roster.
 - Click a bot portrait or its name area to pin the individual control panel.
 - Click the same bot again to close its panel.
-- Use `List Talents` to fetch the selected bot's builds; the specialization menu opens when the reply is received.
+- Use `List Talents` to fetch the selected bot's builds, then use `Choose Spec` to open the specialization menu.
 - Use `Gear` again after changing specialization so CMaNGOS can generate equipment for the new role.
 - `Replies: OFF` hides routine bot command replies while the addon continues to process talent-list responses.
 - Group controls use party chat, or raid chat while in a raid.

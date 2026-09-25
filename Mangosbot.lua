@@ -63,9 +63,11 @@ function UpdateReplyButton()
     for _, panel in pairs(SelectedBotPanels) do
         if (panel.maintenance ~= nil and panel.maintenance.replyButton ~= nil) then
             if (BotRepliesEnabled()) then
-                panel.maintenance.replyButton:SetText("Replies: ON")
+                panel.maintenance.replyButton.tooltip = "Bot command replies: ON"
+                panel.maintenance.replyButton:SetBackdropBorderColor(0.2, 1.0, 0.2, 1.0)
             else
-                panel.maintenance.replyButton:SetText("Replies: OFF")
+                panel.maintenance.replyButton.tooltip = "Bot command replies: OFF"
+                panel.maintenance.replyButton:SetBackdropBorderColor(0, 0, 0, 0.0)
             end
         end
     end
@@ -1024,12 +1026,23 @@ function StartChat()
     editBox:SetText("/w " .. name .. " ")
 end
 
-function CreateMaintenanceTextButton(parent, name, text, x, y, width, tooltip, handler)
-    local button = CreateFrame("Button", nil, parent, "UIPanelButtonTemplate")
+function CreateMaintenanceIconButton(parent, icon, x, y, tooltip, handler, persistent)
+    local button = CreateFrame("Button", nil, parent)
     button:SetPoint("TOPLEFT", parent, "TOPLEFT", x, y)
-    button:SetWidth(width)
+    button:SetWidth(20)
     button:SetHeight(20)
-    button:SetText(text)
+    button:SetBackdrop({
+        edgeFile="Interface/ChatFrame/ChatFrameBackground",
+        tile = false, tileSize = 16, edgeSize = 2,
+        insets = { left = 0, right = 0, top = 0, bottom = 0 }
+    })
+    button:SetBackdropBorderColor(0, 0, 0, 0.0)
+    local image = button:CreateTexture(nil, "BACKGROUND")
+    image:SetTexture("Interface/Addons/Mangosbot/Images/" .. icon .. ".tga")
+    image:SetPoint("TOPLEFT", button, "TOPLEFT", 2, -2)
+    image:SetWidth(16)
+    image:SetHeight(16)
+    button.image = image
     button.tooltip = tooltip
     button:SetScript("OnEnter", function()
         GameTooltip:SetOwner(button, "ANCHOR_TOPLEFT")
@@ -1041,6 +1054,16 @@ function CreateMaintenanceTextButton(parent, name, text, x, y, width, tooltip, h
         if (parent.ownerFrame ~= nil and parent.ownerFrame.botName ~= nil) then
             CurrentBot = parent.ownerFrame.botName
             SelectedBotPanel = parent.ownerFrame
+        end
+        if not persistent then
+            button:SetBackdropBorderColor(0.8, 0.2, 0.2, 1.0)
+            button.flashToken = (button.flashToken or 0) + 1
+            local flashToken = button.flashToken
+            wait(1.5, function(currentButton, expectedToken)
+                if currentButton.flashToken == expectedToken then
+                    currentButton:SetBackdropBorderColor(0, 0, 0, 0.0)
+                end
+            end, button, flashToken)
         end
         handler()
     end)
@@ -1054,19 +1077,19 @@ function CreateMaintenancePanel(frame, y)
     panel:SetWidth(280)
     panel:SetHeight(45)
 
-    panel.initButton = CreateMaintenanceTextButton(panel, "MangosbotInitButton", "Match Level", 0, 0, 82,
-        "Match this bot to your level and initialize its basic equipment and abilities.", InitializeCurrentBot)
-    panel.gearButton = CreateMaintenanceTextButton(panel, "MangosbotGearButton", "Gear", 87, 0, 62,
-        "Generate level- and specialization-appropriate equipment for this bot.", GearCurrentBot)
-    panel.replyButton = CreateMaintenanceTextButton(panel, "MangosbotReplyButton", "Replies: OFF", 154, 0, 122,
-        "Show or hide automatic bot command replies in chat.", ToggleBotReplies)
+    panel.initButton = CreateMaintenanceIconButton(panel, "maintenance_match_level", 0, 0,
+        "Match Level: match this bot to your level and initialize its basic equipment and abilities.", InitializeCurrentBot, false)
+    panel.gearButton = CreateMaintenanceIconButton(panel, "maintenance_gear", 27, 0,
+        "Gear: generate level- and specialization-appropriate equipment for this bot.", GearCurrentBot, false)
+    panel.replyButton = CreateMaintenanceIconButton(panel, "maintenance_replies", 54, 0,
+        "Bot command replies: OFF", ToggleBotReplies, true)
 
-    panel.resetTalentsButton = CreateMaintenanceTextButton(panel, "MangosbotResetTalentsButton", "Reset Talents", 0, -23, 92,
-        "Clear this bot's talents, then recalculate its stats.", ResetCurrentBotTalents)
-    panel.listTalentsButton = CreateMaintenanceTextButton(panel, "MangosbotListTalentsButton", "List Talents", 97, -23, 82,
-        "Ask the bot for every available talent build.", ListCurrentBotTalents)
-    panel.chooseTalentButton = CreateMaintenanceTextButton(panel, "MangosbotChooseTalentButton", "Choose Spec", 184, -23, 92,
-        "Choose one of the talent builds returned by List Talents.", function() OpenTalentMenuForCurrentBot() end)
+    panel.resetTalentsButton = CreateMaintenanceIconButton(panel, "maintenance_reset_talents", 0, -23,
+        "Reset Talents: clear this bot's talents, then recalculate its stats.", ResetCurrentBotTalents, false)
+    panel.listTalentsButton = CreateMaintenanceIconButton(panel, "maintenance_list_talents", 27, -23,
+        "List Talents: ask the bot for every available talent build.", ListCurrentBotTalents, false)
+    panel.chooseTalentButton = CreateMaintenanceIconButton(panel, "maintenance_choose_spec", 54, -23,
+        "Choose Spec: choose one of the talent builds returned by List Talents.", function() OpenTalentMenuForCurrentBot() end, false)
 
     frame.maintenance = panel
     UpdateReplyButton()

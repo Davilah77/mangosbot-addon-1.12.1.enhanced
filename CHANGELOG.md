@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.2.7 - 2026-09-25
+
+### Maintenance icons and project identity
+
+- Replaced the six maintenance text buttons with compact `.tga` icon controls while retaining descriptive tooltips.
+- Added dedicated icon assets for Match Level, Gear, Replies, Reset Talents, List Talents and Choose Spec.
+- Changed the Replies icon border to indicate ON/OFF state.
+- Renamed the project from `Fixed` to `Enhanced` to reflect its expanded scope.
+
 ## 0.2.6 - 2026-09-25
 
 ### Control-state feedback
