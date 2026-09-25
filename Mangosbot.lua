@@ -1078,21 +1078,18 @@ function CreateMaintenancePanel(frame, y)
     local panel = CreateFrame("Frame", nil, frame)
     panel.ownerFrame = frame
     panel:SetPoint("TOPLEFT", frame, "TOPLEFT", 5, -y)
-    panel:SetWidth(280)
+    panel:SetWidth(frame:GetWidth() - 10)
     panel:SetHeight(22)
+    -- Match CreateToolBar exactly. The original rows use only this zero-size
+    -- black border; adding ChatFrameBackground as a fill renders white on the
+    -- 1.12 client.
+    panel:SetBackdropColor(0, 0, 0, 1.0)
     panel:SetBackdrop({
         edgeFile="Interface/ChatFrame/ChatFrameBackground",
         tile = false, tileSize = 16, edgeSize = 0,
         insets = { left = 0, right = 0, top = 0, bottom = 0 }
     })
-    -- Do not use ChatFrameBackground as a backdrop fill: on WoW 1.12 it
-    -- inherits chat transparency and may render white. A vertex-coloured
-    -- texture is deterministic and remains behind the ARTWORK icons.
-    panel.background = panel:CreateTexture(nil, "BACKGROUND")
-    panel.background:SetTexture("Interface\\ChatFrame\\ChatFrameBackground")
-    panel.background:SetVertexColor(0, 0, 0, 1.0)
-    panel.background:SetAlpha(1.0)
-    panel.background:SetAllPoints(panel)
+    panel:SetBackdropBorderColor(0, 0, 0, 1.0)
 
     panel.resetTalentsButton = CreateMaintenanceIconButton(panel, "maintenance_reset_talents", 0, 0,
         "Reset Talents: clear this bot's talents, then recalculate its stats.", ResetCurrentBotTalents, false)

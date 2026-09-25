@@ -6,6 +6,7 @@
 
 - Applied the black backdrop colour after creating the backdrop, preventing the WoW 1.12 client from resetting the compact maintenance bar to white.
 - Replaced the chat-derived backdrop fill with an independent solid-black texture so chat transparency settings cannot affect the bar.
+- Rebuilt the maintenance row with the exact backdrop structure used by the addon's original black toolbars, removing the incompatible fill texture.
 
 ## 0.2.9 - 2026-09-25
 
