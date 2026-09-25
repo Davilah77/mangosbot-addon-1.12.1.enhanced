@@ -3,6 +3,9 @@ Mangosbot_EventFrame:RegisterEvent("PLAYER_TARGET_CHANGED")
 Mangosbot_EventFrame:RegisterEvent("CHAT_MSG_WHISPER")
 Mangosbot_EventFrame:RegisterEvent("CHAT_MSG_ADDON")
 Mangosbot_EventFrame:RegisterEvent("CHAT_MSG_SYSTEM")
+Mangosbot_EventFrame:RegisterEvent("CHAT_MSG_PARTY")
+Mangosbot_EventFrame:RegisterEvent("CHAT_MSG_RAID")
+Mangosbot_EventFrame:RegisterEvent("CHAT_MSG_GUILD")
 Mangosbot_EventFrame:RegisterEvent("UPDATE")
 Mangosbot_EventFrame:Hide()
 
@@ -28,6 +31,73 @@ function SendBotCommand(text, chat, lang, channel)
 end
 function SendBotAddonCommand(text, chat, lang, channel)
     SendBotCommand("#a "..text, chat, lang, channel)
+end
+
+function GetCurrentBotName()
+    if (CurrentBot ~= nil) then return CurrentBot end
+    local name = GetUnitName("target")
+    if (name ~= nil and botTable ~= nil and botTable[name] ~= nil) then return name end
+    return nil
+end
+
+function BotRepliesEnabled()
+    return frameopts ~= nil and frameopts.replyMessages == true
+end
+
+function UpdateReplyButton()
+    if (SelectedBotPanel == nil or SelectedBotPanel.maintenance == nil) then return end
+    local button = SelectedBotPanel.maintenance.replyButton
+    if (button == nil) then return end
+    if (BotRepliesEnabled()) then
+        button:SetText("Replies: ON")
+    else
+        button:SetText("Replies: OFF")
+    end
+end
+
+function ToggleBotReplies()
+    if (frameopts == nil) then frameopts = {} end
+    frameopts.replyMessages = not BotRepliesEnabled()
+    UpdateReplyButton()
+end
+
+function SendBotAdminCommand(command)
+    local bot = GetCurrentBotName()
+    if (bot == nil) then return end
+    SendBotCommand(command .. " " .. bot, "SAY")
+end
+
+function InitializeCurrentBot()
+    SendBotAdminCommand(".bot init")
+end
+
+function GearCurrentBot()
+    SendBotAdminCommand(".bot gear")
+end
+
+function ListCurrentBotTalents()
+    local bot = GetCurrentBotName()
+    if (bot == nil) then return end
+    if (botTable[bot] == nil) then botTable[bot] = {} end
+    botTable[bot].talentBuilds = {}
+    PendingTalentListBot = bot
+    TalentMenuOpenScheduled = false
+    SendBotCommand("talents list", "WHISPER", nil, bot)
+end
+
+function ResetCurrentBotTalents()
+    local bot = GetCurrentBotName()
+    if (bot == nil) then return end
+    SendBotCommand(".reset talents " .. bot, "SAY")
+    wait(0.3, function(name) SendBotCommand(".reset stats " .. name, "SAY") end, bot)
+end
+
+function ApplyTalentBuild(buildName)
+    local bot = TalentMenuForBot
+    if (bot == nil or buildName == nil) then return end
+    SendBotCommand("talents " .. buildName, "WHISPER", nil, bot)
+    wait(0.3, function(name) SendBotCommand(".reset stats " .. name, "SAY") end, bot)
+    PendingTalentListBot = nil
 end
 
 function CreateToolBar(frame, y, name, buttons, x, spacing, register)
@@ -661,7 +731,7 @@ function CreateFormationToolBar(frame, y, name, group, x, spacing, register)
     return CreateToolBar(frame, -y, name, {
         ["near"] = {
             icon = "formation_near",
-            command = {[0] = "follow near"},
+            command = {[0] = "formation near"},
             formation = "near",
             tooltip = "Half-circle",
             index = 0,
@@ -669,7 +739,7 @@ function CreateFormationToolBar(frame, y, name, group, x, spacing, register)
         },
         ["melee"] = {
             icon = "formation_melee",
-            command = {[0] = "follow near"},
+            command = {[0] = "formation melee"},
             formation = "melee",
             tooltip = "Similar to pets",
             index = 1,
@@ -677,7 +747,7 @@ function CreateFormationToolBar(frame, y, name, group, x, spacing, register)
         },
         ["arrow"] = {
             icon = "formation_arrow",
-            command = {[0] = "follow reset"},
+            command = {[0] = "formation arrow"},
             formation = "arrow",
             tooltip = "Tank first, dps/healer last",
             index = 2,
@@ -685,7 +755,7 @@ function CreateFormationToolBar(frame, y, name, group, x, spacing, register)
         },
         ["far"] = {
             icon = "formation_far",
-            command = {[0] = "follow far"},
+            command = {[0] = "formation far"},
             formation = "far",
             tooltip = "Maintain a distance",
             index = 3,
@@ -693,7 +763,7 @@ function CreateFormationToolBar(frame, y, name, group, x, spacing, register)
         },
         ["chaos"] = {
             icon = "formation_chaos",
-            command = {[0] = "follow auto"},
+            command = {[0] = "formation chaos"},
             formation = "chaos",
             tooltip = "Move freely",
             index = 4,
@@ -884,6 +954,48 @@ function StartChat()
     editBox:SetText("/w " .. name .. " ")
 end
 
+function CreateMaintenanceTextButton(parent, name, text, x, y, width, tooltip, handler)
+    local button = CreateFrame("Button", name, parent, "UIPanelButtonTemplate")
+    button:SetPoint("TOPLEFT", parent, "TOPLEFT", x, y)
+    button:SetWidth(width)
+    button:SetHeight(20)
+    button:SetText(text)
+    button.tooltip = tooltip
+    button:SetScript("OnEnter", function()
+        GameTooltip:SetOwner(button, "ANCHOR_TOPLEFT")
+        GameTooltip:SetText(button.tooltip)
+        GameTooltip:Show()
+    end)
+    button:SetScript("OnLeave", function() GameTooltip:Hide() end)
+    button:SetScript("OnClick", handler)
+    return button
+end
+
+function CreateMaintenancePanel(frame, y)
+    local panel = CreateFrame("Frame", "MangosbotMaintenancePanel", frame)
+    panel:SetPoint("TOPLEFT", frame, "TOPLEFT", 5, -y)
+    panel:SetWidth(280)
+    panel:SetHeight(45)
+
+    panel.initButton = CreateMaintenanceTextButton(panel, "MangosbotInitButton", "Match Level", 0, 0, 82,
+        "Match this bot to your level and initialize its basic equipment and abilities.", InitializeCurrentBot)
+    panel.gearButton = CreateMaintenanceTextButton(panel, "MangosbotGearButton", "Gear", 87, 0, 62,
+        "Generate level- and specialization-appropriate equipment for this bot.", GearCurrentBot)
+    panel.listTalentsButton = CreateMaintenanceTextButton(panel, "MangosbotListTalentsButton", "List Talents", 154, 0, 92,
+        "Ask the bot for every available talent build.", ListCurrentBotTalents)
+
+    panel.chooseTalentButton = CreateMaintenanceTextButton(panel, "MangosbotChooseTalentButton", "Choose Spec", 0, -23, 92,
+        "Choose one of the talent builds returned by List Talents.", function() OpenTalentMenuForCurrentBot() end)
+    panel.resetTalentsButton = CreateMaintenanceTextButton(panel, "MangosbotResetTalentsButton", "Reset Talents", 97, -23, 92,
+        "Clear this bot's talents, then recalculate its stats.", ResetCurrentBotTalents)
+    panel.replyButton = CreateMaintenanceTextButton(panel, "MangosbotReplyButton", "Replies: OFF", 194, -23, 82,
+        "Show or hide automatic bot command replies in chat.", ToggleBotReplies)
+
+    frame.maintenance = panel
+    UpdateReplyButton()
+    return panel
+end
+
 function CreateSelectedBotPanel()
     local frame = CreateFrame("Frame", "SelectedBotPanel", UIParent)
     frame:Hide()
@@ -1046,6 +1158,9 @@ function CreateSelectedBotPanel()
     })
 
     y = y + 25
+    CreateMaintenancePanel(frame, y)
+
+    y = y + 50
     CreateFormationToolBar(frame, y, "formation", false, 5, 5, true)
 
     y = y + 25
@@ -1861,12 +1976,54 @@ function OpenDropDownMenu(bot)
 	ToggleDropDownMenu(1, nil, DropDownMenu, 'cursor')
 end
 
+TalentMenuForBot = nil
+PendingTalentListBot = nil
+TalentMenuOpenScheduled = false
+
+function CreateTalentDropDownMenu(parent)
+    local menu = CreateFrame("Frame", "MangosbotTalentDropDownMenu", parent, "UIDropDownMenuTemplate")
+    menu:Hide()
+    UIDropDownMenu_Initialize(menu, function()
+        local bot = TalentMenuForBot
+        if (bot == nil or botTable[bot] == nil or botTable[bot].talentBuilds == nil) then return end
+        for _, buildName in pairs(botTable[bot].talentBuilds) do
+            local selectedBuild = buildName
+            local info = {}
+            info.text = selectedBuild
+            info.checked = false
+            info.justifyH = "LEFT"
+            info.func = function() ApplyTalentBuild(selectedBuild) end
+            UIDropDownMenu_AddButton(info)
+        end
+    end, "MENU")
+    return menu
+end
+
+function OpenTalentMenu(bot)
+    if (bot == nil) then bot = GetCurrentBotName() end
+    if (bot == nil) then return end
+    TalentMenuForBot = bot
+    local builds = botTable[bot] and botTable[bot].talentBuilds
+    if (builds == nil or tablelength(builds) == 0) then
+        DEFAULT_CHAT_FRAME:AddMessage("MangosBot: use List Talents first.")
+        return
+    end
+    local scale,x,y = SelectedBotPanel:GetEffectiveScale(),GetCursorPosition()
+    TalentDropDownMenu:SetPoint("CENTER",nil,"BOTTOMLEFT",x/scale,y/scale)
+    ToggleDropDownMenu(1, nil, TalentDropDownMenu, "cursor")
+end
+
+function OpenTalentMenuForCurrentBot()
+    OpenTalentMenu(GetCurrentBotName())
+end
+
 
 botTable = {}
 SelectedBotPanel = CreateSelectedBotPanel();
 BotRoster = CreateBotRoster();
 BotDebugPanel = CreateBotDebugPanel();
 DropDownMenu = CreateDropDownMenu(BotRoster)
+TalentDropDownMenu = CreateTalentDropDownMenu(SelectedBotPanel)
 CurrentBot = nil
 BotDebugFilter = ""
 
@@ -1913,11 +2070,86 @@ function ShowSelectedBot(name)
             if (width < numButtons) then width = numButtons end
         end
     end
+    height = height + 2
+    if (width < 11) then width = 11 end
+    UpdateReplyButton()
     ResizeBotPanel(SelectedBotPanel, width * 25 + 20, height * 25 + 25)
     SelectedBotPanel:Show()
 end
 
+function AddTalentBuild(bot, buildName)
+    if (botTable[bot] == nil) then botTable[bot] = {} end
+    if (botTable[bot].talentBuilds == nil) then botTable[bot].talentBuilds = {} end
+    for _, existing in pairs(botTable[bot].talentBuilds) do
+        if (existing == buildName) then return false end
+    end
+    table.insert(botTable[bot].talentBuilds, buildName)
+    return true
+end
+
+function ParseTalentBuildList(message, sender)
+    if (sender == nil or sender ~= PendingTalentListBot or message == nil) then return false end
+    local found = false
+    local entries = splitString2(message, ", ")
+    for _, entry in pairs(entries) do
+        local buildName = trim2(entry)
+        -- Keep descriptive qualifiers such as "(mm/sv)" because they are
+        -- part of the configured build name.  Only remove the final point
+        -- distribution displayed by the server, for example "(2/31/18)".
+        local points = string.find(buildName, " %(%d+/%d+/%d+%)$")
+        if (points ~= nil) then buildName = trim2(string.sub(buildName, 1, points - 1)) end
+        if (string.find(buildName, "^pve ") == 1 or string.find(buildName, "^pvp ") == 1) then
+            if (AddTalentBuild(sender, buildName)) then found = true end
+        end
+    end
+    if (found and not TalentMenuOpenScheduled) then
+        TalentMenuOpenScheduled = true
+        wait(0.5, function(bot)
+            TalentMenuOpenScheduled = false
+            PendingTalentListBot = nil
+            OpenTalentMenu(bot)
+        end, sender)
+    end
+    return found
+end
+
+function IsBotGroupReply(message)
+    if (message == nil) then return false end
+    local prefixes = {
+        "Level up!", "pve ", "pvp ", "Following", "Staying", "Fleeing",
+        "Formation", "Stance", "Strategies:", "Loot strategy", "Mana save level",
+        "rti set to", "rti cc set to"
+    }
+    for _, prefix in pairs(prefixes) do
+        if (string.find(message, prefix) == 1) then return true end
+    end
+    return false
+end
+
+function ShouldHideBotChat(chatEvent, message, sender)
+    if (BotRepliesEnabled() or sender == nil or botTable[sender] == nil) then return false end
+    if (chatEvent == "CHAT_MSG_WHISPER") then return true end
+    if (chatEvent == "CHAT_MSG_PARTY" or chatEvent == "CHAT_MSG_RAID" or chatEvent == "CHAT_MSG_GUILD") then
+        return IsBotGroupReply(message)
+    end
+    return false
+end
+
+if (Mangosbot_OriginalChatFrame_OnEvent == nil and ChatFrame_OnEvent ~= nil) then
+    Mangosbot_OriginalChatFrame_OnEvent = ChatFrame_OnEvent
+    function ChatFrame_OnEvent(chatEvent)
+        local currentEvent = chatEvent
+        if (currentEvent == nil) then currentEvent = _G.event end
+        if (ShouldHideBotChat(currentEvent, arg1, arg2)) then return end
+        Mangosbot_OriginalChatFrame_OnEvent(chatEvent)
+    end
+end
+
 Mangosbot_EventFrame:SetScript("OnEvent", function(self)
+    if (event == "CHAT_MSG_WHISPER" or event == "CHAT_MSG_PARTY" or event == "CHAT_MSG_RAID" or event == "CHAT_MSG_GUILD") then
+        ParseTalentBuildList(arg1, arg2)
+    end
+
     if (event == "PLAYER_TARGET_CHANGED") then
         local name = GetUnitName("target")
         local self = GetUnitName("player")
@@ -2228,27 +2460,6 @@ Mangosbot_EventFrame:SetScript("OnEvent", function(self)
                 SendBotCommand(".bot list", "SAY")
                 QueryBotParty()
             end
-            if (string.find(message, "Following") == 1 or string.find(message, "Staying") == 1 or string.find(message, "Fleeing") == 1) then
-                wait(0.1, function() SendBotAddonCommand("nc ?", "WHISPER", nil, sender) end)
-            end
-            if (string.find(message, "Formation set to") == 1) then
-                wait(0.1, function() SendBotAddonCommand("formation ?", "WHISPER", nil, sender) end)
-            end
-            if (string.find(message, "Stance set to") == 1) then
-                wait(0.1, function() SendBotAddonCommand("stance ?", "WHISPER", nil, sender) end)
-            end
-            if (string.find(message, "Loot strategy set to ") == 1) then
-                wait(0.1, function() SendBotAddonCommand("ll ?", "WHISPER", nil, sender) end)
-            end
-            if (string.find(message, "rti set to") == 1) then
-                wait(0.1, function() SendBotAddonCommand("rti ?", "WHISPER", nil, sender) end)
-            end
-            if (string.find(message, "rti cc set to") == 1) then
-                wait(0.1, function() SendBotAddonCommand("rti cc ?", "WHISPER", nil, sender) end)
-            end
-            if (string.find(message, "save mana") == 1) then
-                wait(0.1, function() SendBotAddonCommand("save mana ?", "WHISPER", nil, sender) end)
-            end
             UpdateGroupToolBar()
         end
 
@@ -2331,6 +2542,9 @@ Mangosbot_EventFrame:SetScript("OnEvent", function(self)
                     if (width < numButtons) then width = numButtons end
                 end
             end
+            height = height + 2
+            if (width < 11) then width = 11 end
+            UpdateReplyButton()
             ResizeBotPanel(SelectedBotPanel, width * 25 + 20, height * 25 + 25)
         end
     end

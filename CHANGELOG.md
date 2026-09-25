@@ -1,6 +1,28 @@
 # Changelog
 
-## Unreleased
+## 0.2.0-beta.1 - 2026-09-25
+
+### Bot maintenance and talents
+
+- Added labelled `Match Level`, `Gear`, `List Talents`, `Choose Spec` and `Reset Talents` controls to the individual bot panel.
+- Added `.bot init <name>` integration for matching a bot to the player's level.
+- Added `.bot gear <name>` integration for specialization-aware equipment generation.
+- Added dynamic parsing of `talents list` replies received through whisper, party, raid or guild chat.
+- Added a talent-build menu that sends `talents <build name>` to the selected bot.
+- Added `.reset stats <name>` after talent selection and talent reset.
+- Added `.reset talents <name>` support.
+
+### Chat reply control
+
+- Added a persistent `Replies: ON/OFF` button; routine bot replies are hidden by default.
+- Removed incompatible automatic `#a nc ?`, formation, stance, loot, raid-target and mana follow-up queries.
+- Kept talent-list parsing active even while replies are hidden.
+
+### Formations
+
+- Replaced the incorrect `follow near`, `follow far`, `follow reset` and `follow auto` mappings with `formation near`, `formation melee`, `formation arrow`, `formation far` and `formation chaos`.
+
+## 0.1.0 - Initial CMaNGOS compatibility fixes
 
 ### CMaNGOS command transport
 
@@ -28,10 +50,11 @@
 | Passive | `orders combat passive` |
 | Attack target | `attack` |
 | Pull target | `pull` |
-| Near / melee formation | `follow near` |
-| Arrow/default formation | `follow reset` |
-| Far formation | `follow far` |
-| Free/automatic distance | `follow auto` |
+| Near formation | `formation near` |
+| Melee formation | `formation melee` |
+| Arrow formation | `formation arrow` |
+| Far formation | `formation far` |
+| Free formation | `formation chaos` |
 | Loot everything | `collect combat loot profession quest` |
 | Enable looting | `collect combat loot quest` |
 | Gather profession objects | `collect profession objects` |
